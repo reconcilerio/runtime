@@ -6,7 +6,7 @@ updates:
     interval: daily
   open-pull-requests-limit: 10
   reviewers:
-  - squeedee
+  - scothis
   - mamachanko
 - package-ecosystem: gomod
   directory: "/"
@@ -18,7 +18,7 @@ updates:
     interval: daily
   open-pull-requests-limit: 10
   reviewers:
-  - squeedee
+  - scothis
   - mamachanko
 - package-ecosystem: gomod
   directory: "/hack"
@@ -26,5 +26,5 @@ updates:
     interval: daily
   open-pull-requests-limit: 10
   reviewers:
-  - squeedee
+  - scothis
   - mamachanko

@@ -1,8 +1,8 @@
 
 
-# Contributing to reconciler-runtime
+# Contributing to reconciler.io runtime
 
-The reconciler-runtime project team welcomes contributions from the community. If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will update the issue when you open a Pull Request. For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq).
+The reconciler.io runtime project team welcomes contributions from the community. A contributor license agreement (CLA) is not required. You own full rights to your contribution and agree to license the work to the community under the Apache License v2.0, via a [Developer Certificate of Origin (DCO)](https://developercertificate.org).
 
 ## Contribution Flow
 
@@ -17,20 +17,20 @@ This is a rough outline of what a contributor's workflow looks like:
 Example:
 
 ``` shell
-git remote add upstream https://github.com/vmware/reconciler-runtime.git
-git checkout -b my-new-feature master
+git remote add upstream https://github.com/reconcilerio/runtime.git
+git checkout -b my-new-feature main
 git commit -a
 git push origin my-new-feature
 ```
 
 ### Staying In Sync With Upstream
 
-When your branch gets out of sync with the vmware/master branch, use the following to update:
+When your branch gets out of sync with the reconcilerio/main branch, use the following to update:
 
 ``` shell
 git checkout my-new-feature
 git fetch -a
-git pull --rebase upstream master
+git pull --rebase upstream main
 git push --force-with-lease origin my-new-feature
 ```
 
@@ -53,7 +53,7 @@ If you need to squash changes into an earlier commit, you can use:
 ``` shell
 git add .
 git commit --fixup <commit>
-git rebase -i --autosquash master
+git rebase -i --autosquash main
 git push --force-with-lease origin my-new-feature
 ```
 

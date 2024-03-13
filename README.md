@@ -1090,7 +1090,7 @@ The reconciler.io runtime project team welcomes contributions from the community
 
 `reconciler-runtime` was conceived at VMware within [`projectriff/system`](https://github.com/projectriff/system/) and implemented initially by [Scott Andrews](https://github.com/scothis), [Glyn Normington](https://github.com/glyn) and the [riff community](https://github.com/orgs/projectriff/people) at large, drawing inspiration from [Kubebuilder](https://www.kubebuilder.io) and [Knative](https://knative.dev) reconcilers.
 
-All commits before (TODO this one) are copyright VMware and consumed under the Apache License v2.0, unless otherwise marked. After this point all commits are copyright of the respective author and licensed to the community under the Apache License v2.0, via a [Developer Certificate of Origin (DCO)](https://developercertificate.org).
+All commits before [`7cc9b34`](https://github.com/reconcilerio/runtime/commit/7cc9b348023aa6783ed7e3e5b442f8c6eef2df75) are copyright VMware and consumed under the Apache License v2.0, unless otherwise marked. After this point all commits are copyright of the respective author and licensed to the community under the Apache License v2.0, via a [Developer Certificate of Origin (DCO)](https://developercertificate.org).
 
 ## License
 

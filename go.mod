@@ -1,4 +1,4 @@
-module github.com/vmware-labs/reconciler-runtime
+module reconciler.io/runtime
 
 go 1.21
 

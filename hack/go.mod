@@ -1,4 +1,4 @@
-module github.com/vmware-labs/reconciler-runtime/hack
+module reconciler.io/runtime/hack
 
 go 1.21
 

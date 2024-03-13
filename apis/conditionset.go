@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Knative Authors
+Copyright 2019-2020 the original author or authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,10 +13,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-/*
-Copyright 2019-2020 VMware, Inc.
-SPDX-License-Identifier: Apache-2.0
-*/
 
 package apis
 
@@ -27,8 +23,8 @@ import (
 	"sort"
 	"time"
 
-	rtime "github.com/vmware-labs/reconciler-runtime/time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rtime "reconciler.io/runtime/time"
 )
 
 const (

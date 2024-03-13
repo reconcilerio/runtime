@@ -1,6 +1,14 @@
-reconciler-runtime
-Copyright (c) 2020 VMware, Inc. All Rights Reserved. 
+Reconciler.io runtime
+Copyright 2024 the original author or authors.
 
-This product is licensed to you under the Apache 2.0 license (the "License").  You may not use this product except in compliance with the Apache 2.0 License.  
+Reconciler.io runtime is a fork of reconciler-runtime (https://github.com/vmware-labs/reconciler-runtime),
+consumed under the Apache 2.0 license.
+Copyright 2019-2024 VMware, Inc. All Rights Reserved. 
 
-This product may include a number of subcomponents with separate copyright notices and license terms. Your use of these subcomponents is subject to the terms and conditions of the subcomponent's license, as noted in the LICENSE file. 
+The initial development of some parts of the framework, which are copied from, derived from, or
+inspired by Knative (https://knative.dev/).
+Copyright 2019 The Knative Authors
+
+This product may include a number of subcomponents with separate copyright notices and license terms.
+Your use of these subcomponents is subject to the terms and conditions of the subcomponent's license,
+as noted in the LICENSE file. 

@@ -1,13 +1,13 @@
-# reconciler-runtime <!-- omit in toc -->
+# Reconciler.io runtime <!-- omit in toc -->
 
-![CI](https://github.com/vmware-labs/reconciler-runtime/workflows/CI/badge.svg?branch=main)
-[![GoDoc](https://godoc.org/github.com/vmware-labs/reconciler-runtime?status.svg)](https://godoc.org/github.com/vmware-labs/reconciler-runtime)
-[![Go Report Card](https://goreportcard.com/badge/github.com/vmware-labs/reconciler-runtime)](https://goreportcard.com/report/github.com/vmware-labs/reconciler-runtime)
-[![codecov](https://codecov.io/gh/vmware-labs/reconciler-runtime/branch/main/graph/badge.svg)](https://codecov.io/gh/vmware-labs/reconciler-runtime)
+![CI](https://github.com/reconcilerio/runtime/workflows/CI/badge.svg?branch=main)
+[![GoDoc](https://godoc.org/reconciler.io/runtime?status.svg)](https://godoc.org/reconciler.io/runtime)
+[![Go Report Card](https://goreportcard.com/badge/reconciler.io/runtime)](https://goreportcard.com/report/reconciler.io/runtime)
+[![codecov](https://codecov.io/gh/reconcilerio/runtime/main/graph/badge.svg)](https://codecov.io/gh/reconcilerio/runtime)
 
-`reconciler-runtime` is an opinionated framework for authoring and testing Kubernetes reconcilers using [`controller-runtime`](https://github.com/kubernetes-sigs/controller-runtime) project. `controller-runtime` provides infrastructure for creating and operating controllers, but provides little support for the business logic of implementing a reconciler within the controller. The [`Reconciler` interface](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/reconcile#Reconciler) provided by `controller-runtime` is the primary hand-off point with `reconciler-runtime`.
+`reconciler.io` is an opinionated framework for authoring and testing Kubernetes reconcilers using [`controller-runtime`](https://github.com/kubernetes-sigs/controller-runtime) project. `controller-runtime` provides infrastructure for creating and operating controllers, but provides little support for the business logic of implementing a reconciler within the controller. The [`Reconciler` interface](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/reconcile#Reconciler) provided by `controller-runtime` is the primary hand-off point with `reconciler.io`.
 
-Within an existing Kubebuilder or controller-runtime project, reconciler-runtime may be adopted incrementally without disrupting existing controllers. A common approach for adopting reconciler-runtime to use the [testing](#testing) support to test existing reconcilers in a project. If there is a use case reconciler-runtime does not handle well, you may drop down to the controller-runtime APIs directly, or use any other library that is compatible with controller-runtime.
+Within an existing Kubebuilder or controller-runtime project, reconcilers.io may be adopted incrementally without disrupting existing controllers. A common approach for adopting reconciler.io runtime to use the [testing](#testing) support to test existing reconcilers in a project. If there is a use case runtime does not handle well, you may drop down to the controller-runtime APIs directly, or use any other library that is compatible with controller-runtime.
 
 <!-- ToC managed by https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one -->
 - [Reconcilers](#reconcilers)
@@ -59,13 +59,13 @@ Unstructured types are useful when the resources are not known at compile time a
 
 Semi-structured duck types offer a middle ground. They are strongly typed, but only cover a subset of the full object. They are intended to facilitate normalized operations across a number of concrete types that share a common subset of their own schema. The concrete objects compatible with this type are not required to be known at compile time. Because duck types are not full objects, client operations for `Create` and `Update` are disallowed (`Patch` is available). Like unstructured objects, the duck type should not be registered in the scheme, and the [`TypeMeta`](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#TypeMeta) `APIVersion` and `Kind` fields must be defined for the client to operate on the object.
 
-The controller-runtime client is able to work with structured and unstructured objects natively, reconciler-runtime adds support for duck typed objects via the [`duck.NewDuckAwareClientWrapper`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/duck#NewDuckAwareClientWrapper).
+The controller-runtime client is able to work with structured and unstructured objects natively, reconciler.io runtime adds support for duck typed objects via the [`duck.NewDuckAwareClientWrapper`](https://pkg.go.dev/reconciler.io/runtime/duck#NewDuckAwareClientWrapper).
 
 <a name="parentreconciler" />
 
 ### ResourceReconciler
 
-A [`ResourceReconciler`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#ResourceReconciler) (formerly ParentReconciler) is responsible for orchestrating the reconciliation of a single resource. The reconciler delegates the manipulation of other resources to SubReconcilers.
+A [`ResourceReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceReconciler) (formerly ParentReconciler) is responsible for orchestrating the reconciliation of a single resource. The reconciler delegates the manipulation of other resources to SubReconcilers.
 
 The resource reconciler is responsible for:
 - fetching the resource being reconciled
@@ -130,7 +130,7 @@ rules:
 
 ### AggregateReconciler
 
-An [`AggregateReconciler`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#AggregateReconciler) is responsible for synthesizing a single resource, aggregated from other state. The AggregateReconciler is a fusion of the [ResourceReconciler](#resourcereconciler) and [ChildReconciler](#childreconciler). Instead of operating on all resources of a type, it will only operate on a specific resource identified by the type and request (namespace and name). Unlike the child reconciler, the "parent" and "child" resources are the same.
+An [`AggregateReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#AggregateReconciler) is responsible for synthesizing a single resource, aggregated from other state. The AggregateReconciler is a fusion of the [ResourceReconciler](#resourcereconciler) and [ChildReconciler](#childreconciler). Instead of operating on all resources of a type, it will only operate on a specific resource identified by the type and request (namespace and name). Unlike the child reconciler, the "parent" and "child" resources are the same.
 
 The aggregate reconciler is responsible for:
 - fetching the resource being reconciled
@@ -217,11 +217,11 @@ rules:
 
 ### SubReconciler
 
-The [`SubReconciler`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#SubReconciler) interface defines the contract between the host and sub reconcilers.
+The [`SubReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#SubReconciler) interface defines the contract between the host and sub reconcilers.
 
 #### SyncReconciler
 
-The [`SyncReconciler`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#SyncReconciler) is the minimal type-aware sub reconciler. It is used to manage a portion of the resource reconciliation that is custom, or whose behavior is not covered by another sub reconciler type. Common uses include looking up reference data for the reconciliation, or controlling APIs that are not Kubernetes resources.
+The [`SyncReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#SyncReconciler) is the minimal type-aware sub reconciler. It is used to manage a portion of the resource reconciliation that is custom, or whose behavior is not covered by another sub reconciler type. Common uses include looking up reference data for the reconciliation, or controlling APIs that are not Kubernetes resources.
 
 When a resource is deleted that has pending finalizers, the Finalize method is called instead of the Sync method. If the SyncDuringFinalization field is true, the Sync method will also by called. If creating state that must be manually cleaned up, it is the users responsibility to define and clear finalizers. Using the [finalizer helper methods](#finalizers) is strongly encouraged with working under a [ResourceReconciler](#resourcereconciler).
 
@@ -251,7 +251,7 @@ func FunctionTargetImageReconciler(c reconcilers.Config) reconcilers.SubReconcil
 
 #### ChildReconciler
 
-The [`ChildReconciler`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#ChildReconciler) is a sub reconciler that is responsible for managing a single controlled resource. Within a child reconciler, the reconciled resource is referred to as the parent resource to avoid ambiguity with the child resource. A developer defines their desired state for the child resource (if any), and the reconciler creates/updates/deletes the resource to match the desired state. The child resource is also used to update the parent's status. Mutations and errors are recorded for the parent.
+The [`ChildReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ChildReconciler) is a sub reconciler that is responsible for managing a single controlled resource. Within a child reconciler, the reconciled resource is referred to as the parent resource to avoid ambiguity with the child resource. A developer defines their desired state for the child resource (if any), and the reconciler creates/updates/deletes the resource to match the desired state. The child resource is also used to update the parent's status. Mutations and errors are recorded for the parent.
 
 The `ChildReconciler` is responsible for:
 - looking up an existing child
@@ -367,7 +367,7 @@ rules:
 
 #### ChildSetReconciler
 
-The [`ChildSetReconciler`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#ChildSetReconciler) is an orchestration of zero to many, dynamically defined [`ChildReconcilers`](#childreconciler). Concepts from `ChildReconciler` apply here unless noted otherwise.
+The [`ChildSetReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ChildSetReconciler) is an orchestration of zero to many, dynamically defined [`ChildReconcilers`](#childreconciler). Concepts from `ChildReconciler` apply here unless noted otherwise.
 
 Unlike `ChildReconciler` where a single desired child is defined, the `ChildSetReconciler` returns zero to many desired children, each child resource must contain a stable identifier extracted from the child resource by `IdentifyChild`, which is used to correlate desired children with actual children within the cluster.
 
@@ -406,7 +406,7 @@ Higher order reconcilers are SubReconcilers that do not perform work directly, b
 
 #### CastResource
 
-A [`CastResource`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#CastResource) (formerly CastParent) casts the ResourceReconciler's type by projecting the resource data onto a new struct. Casting the reconciled resource is useful to create cross cutting reconcilers that can operate on common portion of multiple  resource kinds, commonly referred to as a duck type.
+A [`CastResource`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CastResource) (formerly CastParent) casts the ResourceReconciler's type by projecting the resource data onto a new struct. Casting the reconciled resource is useful to create cross cutting reconcilers that can operate on common portion of multiple  resource kinds, commonly referred to as a duck type.
 
 The `CastResource` can also be used to bridge a `SubReconciler` for a specific struct to a generic SubReconciler that can process any object by using `client.Object` as the CastType generic type. In this case, the resource is passed through without coercion.
 
@@ -437,7 +437,7 @@ func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*b
 
 #### Sequence
 
-A [`Sequence`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Sequence) composes multiple SubReconcilers as a single SubReconciler. Each sub reconciler is called in turn, aggregating the result of each sub reconciler. A reconciler returning an error will interrupt the sequence.
+A [`Sequence`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Sequence) composes multiple SubReconcilers as a single SubReconciler. Each sub reconciler is called in turn, aggregating the result of each sub reconciler. A reconciler returning an error will interrupt the sequence.
 
 **Example:**
 
@@ -459,7 +459,7 @@ func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*b
 
 #### IfThen
 
-An [`IfThen`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#IfThen) branches execution of the current reconcile request based on a condition. The false `Else` branch is optional and ignored if not defined.
+An [`IfThen`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#IfThen) branches execution of the current reconcile request based on a condition. The false `Else` branch is optional and ignored if not defined.
 
 **Example:**
 
@@ -480,7 +480,7 @@ func GatedReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
 
 #### While
 
-A [`While`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#While) calls the reconciler so long as the condition is true, up to the maximum number of iterations (defaults to 100). The current iteration index can be retrieved with [`RetrieveIteration`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveIteration).
+A [`While`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#While) calls the reconciler so long as the condition is true, up to the maximum number of iterations (defaults to 100). The current iteration index can be retrieved with [`RetrieveIteration`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveIteration).
 
 This reconciler must not be used to wait for external state to change, or for polling as this will block the reconciler queue. It is best to return with the result requesting to be requeued, or to watch the external state for changes that enqueue the reconcile request.
 
@@ -506,7 +506,7 @@ func TenTimesReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
 
 #### TryCatch
 
-A [`TryCatch`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#TryCatch) is used to recover from errors returned by a reconciler. The `Catch` method is called with the result and error from the `Try` reconciler, giving it the option to either continue the existing results, or replace them with new results.
+A [`TryCatch`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#TryCatch) is used to recover from errors returned by a reconciler. The `Catch` method is called with the result and error from the `Try` reconciler, giving it the option to either continue the existing results, or replace them with new results.
 
 The `Finally` reconciler is always called before returning, but does not alter the existing result and err values unless it itself errors. The `Finally` reconciler should avoid complex logic and be limited to cleaning up common state from the `Try` reconciler.
 
@@ -532,7 +532,7 @@ func IgnoreErrorsReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function
 
 #### OverrideSetup
 
-An [`OverrideSetup`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#OverrideSetup) is used to suppress or replace the setup behavior for a reconciler.
+An [`OverrideSetup`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#OverrideSetup) is used to suppress or replace the setup behavior for a reconciler.
 
 **Example:**
 
@@ -561,7 +561,7 @@ func CustomSetupReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function]
 
 #### WithConfig
 
-[`WithConfig`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#WithConfig) overrides the config that nested reconcilers consume. The config can be retrieved from the context via [`RetrieveConfig`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveConfig). For interactions with the reconciled resource, the config originally used to load that resource should be used, which can be retrieved from the context via [`RetrieveOriginalConfig`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveOriginalConfig).
+[`WithConfig`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#WithConfig) overrides the config that nested reconcilers consume. The config can be retrieved from the context via [`RetrieveConfig`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveConfig). For interactions with the reconciled resource, the config originally used to load that resource should be used, which can be retrieved from the context via [`RetrieveOriginalConfig`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveOriginalConfig).
 
 **Example:**
 
@@ -588,7 +588,7 @@ func SwapRESTConfig(rc *rest.Config) *reconcilers.SubReconciler[*resources.MyRes
 
 #### WithFinalizer
 
-[`WithFinalizer`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#WithFinalizer) allows external state to be allocated and then cleaned up once the resource is deleted. When the resource is not terminating, the finalizer is set on the reconciled resource before the nested reconciler is called. When the resource is terminating, the finalizer is cleared only after the nested reconciler returns without an error.
+[`WithFinalizer`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#WithFinalizer) allows external state to be allocated and then cleaned up once the resource is deleted. When the resource is not terminating, the finalizer is set on the reconciled resource before the nested reconciler is called. When the resource is terminating, the finalizer is cleared only after the nested reconciler returns without an error.
 
 The [Finalizers](#finalizers) utilities are used to manage the finalizer on the reconciled resource.
 
@@ -618,9 +618,9 @@ func SyncExternalState() *reconcilers.SubReconciler[*resources.MyResource] {
 
 ### AdmissionWebhookAdapter
 
-[`AdmissionWebhookAdapter`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#AdmissionWebhookAdapter) allows using [SubReconciler](#subreconciler) to process [admission webhook requests](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-request-and-response). The full suite of sub-reconcilers are available, however, behavior that is [generally not accepted](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#side-effects) within a webhook is discouraged. For example, new requests against the API server are discouraged (reading from an informer is ok), mutation requests against the API Server can cause a loop with the webhook processing its own requests.
+[`AdmissionWebhookAdapter`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#AdmissionWebhookAdapter) allows using [SubReconciler](#subreconciler) to process [admission webhook requests](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#webhook-request-and-response). The full suite of sub-reconcilers are available, however, behavior that is [generally not accepted](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#side-effects) within a webhook is discouraged. For example, new requests against the API server are discouraged (reading from an informer is ok), mutation requests against the API Server can cause a loop with the webhook processing its own requests.
 
-All requests are allowed by default unless the [response.Allowed](https://pkg.go.dev/k8s.io/api/admission/v1#AdmissionResponse.Allowed) field is explicitly set, or the reconciler returns an error. The raw admission request and response can be retrieved from the context via the [`RetrieveAdmissionRequest`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveAdmissionRequest) and [`RetrieveAdmissionResponse`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveAdmissionResponse) methods, respectively. The [`Result`](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/reconcile#Result) typically returned by a reconciler is unused.
+All requests are allowed by default unless the [response.Allowed](https://pkg.go.dev/k8s.io/api/admission/v1#AdmissionResponse.Allowed) field is explicitly set, or the reconciler returns an error. The raw admission request and response can be retrieved from the context via the [`RetrieveAdmissionRequest`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveAdmissionRequest) and [`RetrieveAdmissionResponse`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveAdmissionResponse) methods, respectively. The [`Result`](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/reconcile#Result) typically returned by a reconciler is unused.
 
 The request object is unmarshaled from the request object for most operations, and the old object for delete operations. If the webhhook handles multiple resources or versions of the same resource with different shapes, use of an unstructured type is recommended.
 
@@ -676,7 +676,7 @@ mgr.GetWebhookServer().Register("/interceptor", controllers.AdmissionProjectorWe
 
 ## Testing
 
-While `controller-runtime` focuses its testing efforts on integration testing by spinning up a new API Server and etcd, `reconciler-runtime` focuses on unit testing reconcilers. The state for each test case is pure, preventing side effects from one test case impacting the next.
+While `controller-runtime` focuses its testing efforts on integration testing by spinning up a new API Server and etcd, `reconciler.io` focuses on unit testing reconcilers. The state for each test case is pure, preventing side effects from one test case impacting the next.
 
 The table test pattern is used to declare each test case in a test suite with the resource being reconciled, other given resources in the cluster, and all expected resource mutations (create, update, delete).
 
@@ -690,7 +690,7 @@ Colorized diffs are available in assertion error messages by setting the environ
 
 ### ReconcilerTests
 
-[`ReconcilerTestCase`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#ReconcilerTestCase) run the full reconciler via the controller runtime Reconciler's Reconcile method. There are two ways to compose a ReconcilerTestCase either as an unordered set using [`ReconcilerTests`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#ReconcilerTests), or an order list using [`ReconcilerTestSuite`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#ReconcilerTestSuite). When using `ReconcilerTests` the key for each test case is used as the name for that test case.
+[`ReconcilerTestCase`](https://pkg.go.dev/reconciler.io/runtime/testing#ReconcilerTestCase) run the full reconciler via the controller runtime Reconciler's Reconcile method. There are two ways to compose a ReconcilerTestCase either as an unordered set using [`ReconcilerTests`](https://pkg.go.dev/reconciler.io/runtime/testing#ReconcilerTests), or an order list using [`ReconcilerTestSuite`](https://pkg.go.dev/reconciler.io/runtime/testing#ReconcilerTestSuite). When using `ReconcilerTests` the key for each test case is used as the name for that test case.
 
 **Example:**
 
@@ -748,13 +748,13 @@ rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.ReconcilerTestCase, c reconc
 
 ### SubReconcilerTests
 
-For more complex reconcilers, the number of moving parts can make it difficult to fully cover all aspects of the reonciler and handle corner cases and sources of error. The [`SubReconcilerTestCase`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#SubReconcilerTestCase) enables testing a single sub reconciler in isolation from the resource. While very similar to ReconcilerTestCase, these are the differences:
+For more complex reconcilers, the number of moving parts can make it difficult to fully cover all aspects of the reonciler and handle corner cases and sources of error. The [`SubReconcilerTestCase`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestCase) enables testing a single sub reconciler in isolation from the resource. While very similar to ReconcilerTestCase, these are the differences:
 
 - `Request` is replaced with `Resource` since the resource is not lookedup, but handed to the reconciler. `ExpectResource` is the mutated value of the resource after the reconciler runs.
 - `GivenStashedValues` is a map of stashed value to seed, `ExpectStashedValues` are individually compared with the actual stashed value after the reconciler runs.
 - `ExpectStatusUpdates` is not available
 
-There are two ways to compose a SubReconcilerTestCase either as an unordered set using [`SubReconcilerTests`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#SubReconcilerTests), or an order list using [`SubReconcilerTestSuite`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#SubReconcilerTestSuite). When using `SubReconcilerTests` the key for each test case is used as the name for that test case.
+There are two ways to compose a SubReconcilerTestCase either as an unordered set using [`SubReconcilerTests`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTests), or an order list using [`SubReconcilerTestSuite`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestSuite). When using `SubReconcilerTests` the key for each test case is used as the name for that test case.
 
 **Example:**
 
@@ -795,7 +795,7 @@ rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*strea
 
 ### AdmissionWebhookTests
 
-[`AdmissionWebhookTestCase`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#AdmissionWebhookTestCase) runs the full webhook handler via the controller runtime [webhook handler's](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/webhook/admission#Handler) Handle method. There are two ways to compose a AdmissionWebhookTestCase either as an unordered set using [`AdmissionWebhookTests`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#AdmissionWebhookTests), or an order list using [`AdmissionWebhookTestSuite`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#AdmissionWebhookTestSuite). When using `AdmissionWebhookTestSuite` the key for each test case is used as the name for that test case.
+[`AdmissionWebhookTestCase`](https://pkg.go.dev/reconciler.io/runtime/testing#AdmissionWebhookTestCase) runs the full webhook handler via the controller runtime [webhook handler's](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/webhook/admission#Handler) Handle method. There are two ways to compose a AdmissionWebhookTestCase either as an unordered set using [`AdmissionWebhookTests`](https://pkg.go.dev/reconciler.io/runtime/testing#AdmissionWebhookTests), or an order list using [`AdmissionWebhookTestSuite`](https://pkg.go.dev/reconciler.io/runtime/testing#AdmissionWebhookTestSuite). When using `AdmissionWebhookTestSuite` the key for each test case is used as the name for that test case.
 
 **Example**
 
@@ -862,27 +862,27 @@ wts.Run(t, scheme, func(t *testing.T, wtc *rtesting.AdmissionWebhookTestCase, c 
 
 ### ExpectConfig
 
-The [`ExpectConfig`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#ExpectConfig) is a testing object that can create a [Config](#config) with given test state that will observe the reconciler's behavior against the config and can assert that the observed behavior matches the expected behavior. When used with the `AdditionalConfigs` field of [ReconcilerTestCase](#reconcilertests) and [SubReconcilerTestCase](#subreconcilertests), the corresponding configs can be obtained with [`RetrieveAdditionalConfigs`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveAdditionalConfigs). Use of `RetrieveAdditionalConfigs` should be limited to a reconciler that is dedicated to work with multiple configs like [WithConfig](#withconfig); reconcilers nested under WithConfig should interact with the default config.
+The [`ExpectConfig`](https://pkg.go.dev/reconciler.io/runtime/testing#ExpectConfig) is a testing object that can create a [Config](#config) with given test state that will observe the reconciler's behavior against the config and can assert that the observed behavior matches the expected behavior. When used with the `AdditionalConfigs` field of [ReconcilerTestCase](#reconcilertests) and [SubReconcilerTestCase](#subreconcilertests), the corresponding configs can be obtained with [`RetrieveAdditionalConfigs`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveAdditionalConfigs). Use of `RetrieveAdditionalConfigs` should be limited to a reconciler that is dedicated to work with multiple configs like [WithConfig](#withconfig); reconcilers nested under WithConfig should interact with the default config.
 
 ## Utilities
 
 ### Config
 
-The [`Config`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Config) is a single object that contains the common remote APIs needed by a reconciler. The config object includes:
-- [`Client`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Config.Client) as the primary interaction with the Kubernetes API Server. Gets and Lists are read from informers when available.
-- [`APIReader`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Config.APIReader) read-only Kubernetes API Server client that bypasses informers.
-- [`Recorder`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Config.Recorder) record Kubernetes events for a resource.
-- [`Tracker`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Config.Tracker) track relationships between resource, and later lookup resources tracking a specific resource.
+The [`Config`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config) is a single object that contains the common remote APIs needed by a reconciler. The config object includes:
+- [`Client`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.Client) as the primary interaction with the Kubernetes API Server. Gets and Lists are read from informers when available.
+- [`APIReader`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.APIReader) read-only Kubernetes API Server client that bypasses informers.
+- [`Recorder`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.Recorder) record Kubernetes events for a resource.
+- [`Tracker`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.Tracker) track relationships between resource, and later lookup resources tracking a specific resource.
 
-Root reconcilers like [ResourceReconciler](#resourcereconciler) and [AdmissionWebhookAdapter](#admissionwebhookadapter) accept a Config to use that is then passed to [SubReconciler](#subreconciler) via the context, and retrieved using [`RetrieveConfigOrDie`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveConfigOrDie). The active config may be modified at runtime using [WithConfig](#withconfig).
+Root reconcilers like [ResourceReconciler](#resourcereconciler) and [AdmissionWebhookAdapter](#admissionwebhookadapter) accept a Config to use that is then passed to [SubReconciler](#subreconciler) via the context, and retrieved using [`RetrieveConfigOrDie`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveConfigOrDie). The active config may be modified at runtime using [WithConfig](#withconfig).
 
 To setup a Config for a test and make assertions that the expected behavior matches the observed behavior, use [ExpectConfig](#expectconfig).
 
 ### Stash
 
-The stash allows passing arbitrary state between sub reconcilers within the scope of a single reconciler request. Values are stored on the context by [`StashValue`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#StashValue) and accessed via [`RetrieveValue`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#RetrieveValue).
+The stash allows passing arbitrary state between sub reconcilers within the scope of a single reconciler request. Values are stored on the context by [`StashValue`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#StashValue) and accessed via [`RetrieveValue`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveValue).
 
-For testing, given stashed values can be defined in a [SubReconcilerTests](#subreconcilertests) with [`GivenStashedValues`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#SubReconcilerTestCase.GivenStashedValues). Newly stashed or mutated values expectations are defined with [`ExpectStashedValues`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#SubReconcilerTestCase.ExpectStashedValues). An optional, custom function for asserting stashed values can be provided via [`VerifyStashedValue`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#SubReconcilerTestCase.VerifyStashedValue).
+For testing, given stashed values can be defined in a [SubReconcilerTests](#subreconcilertests) with [`GivenStashedValues`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestCase.GivenStashedValues). Newly stashed or mutated values expectations are defined with [`ExpectStashedValues`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestCase.ExpectStashedValues). An optional, custom function for asserting stashed values can be provided via [`VerifyStashedValue`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestCase.VerifyStashedValue).
 
 **Example:**
 
@@ -917,13 +917,13 @@ func StashExampleSubReconciler(c reconcilers.Config) reconcilers.SubReconciler[*
 
 ### Tracker
 
-The [`Tracker`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/tracker#Tracker) provides a means for one resource to watch another resource for mutations, triggering the reconciliation of the resource defining the reference.
+The [`Tracker`](https://pkg.go.dev/reconciler.io/runtime/tracker#Tracker) provides a means for one resource to watch another resource for mutations, triggering the reconciliation of the resource defining the reference.
 
-Resources can either be tracked by name or with a label selector using [`TrackReference`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/tracker#Tracker.TrackReference).
+Resources can either be tracked by name or with a label selector using [`TrackReference`](https://pkg.go.dev/reconciler.io/runtime/tracker#Tracker.TrackReference).
 
-It's common to work with a resource that is also tracked. The [Config.TrackAndGet](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Config.TrackAndGet) method uses the same signature as client.Get, but additionally tracks the resource. Likewise, the [Config.TrackAndList](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#Config.TrackAndList) method uses the same signature as client.List, but additionally tracks resources matching the query.
+It's common to work with a resource that is also tracked. The [Config.TrackAndGet](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.TrackAndGet) method uses the same signature as client.Get, but additionally tracks the resource. Likewise, the [Config.TrackAndList](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.TrackAndList) method uses the same signature as client.List, but additionally tracks resources matching the query.
 
-In the [Setup](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#SyncReconciler) method, a watch is created that will notify the handler every time a resource of that kind is mutated. The [EnqueueTracked](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#EnqueueTracked) helper returns a list of resources that are tracking the given resource, those resources are enqueued for the reconciler.
+In the [Setup](https://pkg.go.dev/reconciler.io/runtime/reconcilers#SyncReconciler) method, a watch is created that will notify the handler every time a resource of that kind is mutated. The [EnqueueTracked](https://pkg.go.dev/reconciler.io/runtime/reconcilers#EnqueueTracked) helper returns a list of resources that are tracking the given resource, those resources are enqueued for the reconciler.
 
 The tracker will automatically expire a track request if not periodically renewed. By default, the TTL is 2x the resync internal. This ensures all tracked resources will naturally have the tracking relationship refreshed as part of the normal reconciliation resource. There is no need to manually untrack a resource.
 
@@ -1010,7 +1010,7 @@ Deleting a resource that uses finalizers requires the controller to be running.
 >
 > A single WithFinalizer will always add a finalizer to the reconciled resource. It can then compose multiple ChildReconcilers, as well as other reconcilers that do not natively support managing finalizers (e.g. SyncReconciler). On the other hand, the ChildReconciler will only set the finalizer when it is required potentially reducing the number of finalizers, but only covers that exact sub-reconciler. It's important the external state that needs to be cleaned up be covered by a finalizer, it does not matter which finalizer is used.
 
-The [AddFinalizer](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#AddFinalizer) and [ClearFinalizer](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#ClearFinalizer) functions patch the reconciled resource to update its finalizers. These methods work with [CastResource](#castresource) resources and use the same client the [ResourceReconciler](#resourcereconciler) used to originally load the reconciled resource. They can be called inside [SubReconcilers](#subreconciler) that may use a different client.
+The [AddFinalizer](https://pkg.go.dev/reconciler.io/runtime/reconcilers#AddFinalizer) and [ClearFinalizer](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ClearFinalizer) functions patch the reconciled resource to update its finalizers. These methods work with [CastResource](#castresource) resources and use the same client the [ResourceReconciler](#resourcereconciler) used to originally load the reconciled resource. They can be called inside [SubReconcilers](#subreconciler) that may use a different client.
 
 When an update is required, only the `.metadata.finalizers` field is patched. The reconciled resource's `.metadata.resourceVersion` is used as an optimistic concurrency lock, and is updated with the value returned from the server. Any error from the server will cause the resource reconciliation to err. When testing with [SubReconcilerTests](#subreconcilertests), the resource version of the resource defaults to `"999"`, the patch bytes include the resource version and the response increments the reonciled resource's version. For a resource with the default version that patches a finalizer, the expected reconciled resource will have a resource version of `"1000"`.
 
@@ -1046,7 +1046,7 @@ A minimal test case for a sub reconciler that adds a finalizer may look like:
 
 ### ResourceManager
 
-The [`ResourceManager`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/reconcilers#ResourceManager) provides a means to manage a single resource by synchronizing the current and desired state. The resource will be created if it does not exist, deleted if no longer desired and updated when semantically different. The same resource manager should be reused to manage multiple resources and must be reused when managing the same resource over time in order to take full effect. This utility is used by the [ChildReconciler](#childreconciler) and [AggregateReconciler](#aggregatereconciler).
+The [`ResourceManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceManager) provides a means to manage a single resource by synchronizing the current and desired state. The resource will be created if it does not exist, deleted if no longer desired and updated when semantically different. The same resource manager should be reused to manage multiple resources and must be reused when managing the same resource over time in order to take full effect. This utility is used by the [ChildReconciler](#childreconciler) and [AggregateReconciler](#aggregatereconciler).
 
 The `Manage(ctx context.Context, resource, actual, desired client.Object) (client.Object, error)` method take three objects and returns another object:
 - `resource` is the reconciled resource, events, tracks and finalizer are against this object. May be an object of any underlaying type.
@@ -1062,17 +1062,17 @@ If requested, the managed resource will be tracked for the resource.
 
 ### Time
 
-Reconcilers that capture timestamps can be notoriously difficult to test, as the output will be different for every execution. While we don't have a time machine, reconciler-runtime provides an alterate API to fetch the current time within a reconciler. [`rtime.RetrieveTime(context.Context)`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/time#RetrieveTime) can be used within a reconciler to get the [`time.Time`](https://pkg.go.dev/time#Time) when the reconciler request started processing. The value returned is guaranteed to remain stable for the lifespan of the reconcile request. Calls to [`time.Now`](https://pkg.go.dev/time#Now) will continue to return an up to date timestamp.
+Reconcilers that capture timestamps can be notoriously difficult to test, as the output will be different for every execution. While we don't have a time machine, reconciler.io runtime provides an alterate API to fetch the current time within a reconciler. [`rtime.RetrieveTime(context.Context)`](https://pkg.go.dev/reconciler.io/runtime/time#RetrieveTime) can be used within a reconciler to get the [`time.Time`](https://pkg.go.dev/time#Time) when the reconciler request started processing. The value returned is guaranteed to remain stable for the lifespan of the reconcile request. Calls to [`time.Now`](https://pkg.go.dev/time#Now) will continue to return an up to date timestamp.
 
-Reconciler tests can seed this timestamp by defining the [`Now`](https://pkg.go.dev/github.com/vmware-labs/reconciler-runtime/testing#ReconcilerTestCase.Now) field on the test case. The reconciler will be run with the desired time instead of "now". The timestamp set on the test case can also be used in the expectations to pin values that would otherwise float.
+Reconciler tests can seed this timestamp by defining the [`Now`](https://pkg.go.dev/reconciler.io/runtime/testing#ReconcilerTestCase.Now) field on the test case. The reconciler will be run with the desired time instead of "now". The timestamp set on the test case can also be used in the expectations to pin values that would otherwise float.
 
 ## Breaking Changes
 
-Known breaking changes are captured in the [release notes](https://github.com/vmware-labs/reconciler-runtime/releases), it is strongly recomened to review the release notes before upgrading to a new version of reconciler-runtime. When possible, breaking changes are first marked as deprecations before full removal in a later release. Patch releases will be issued to fix significant bugs and unintentional breaking changes.
+Known breaking changes are captured in the [release notes](https://github.com/reconcilerio/runtime/releases), it is strongly recomened to review the release notes before upgrading to a new version of reconciler.io. When possible, breaking changes are first marked as deprecations before full removal in a later release. Patch releases will be issued to fix significant bugs and unintentional breaking changes.
 
-We strive to release reconciler-runtime against the latest Kubernetes and controller-runtime releases. Upstream breaking changes in either dependency may also force changes in reconciler-runtime without a deprecation period.
+We strive to release reconciler.io runtime against the latest Kubernetes and controller-runtime releases. Upstream breaking changes in either dependency may also force changes in runtime without a deprecation period.
 
-reconciler-runtime is rapidly evolving. While we strive for API compatability between releases, functionality that is better handled using a different API may be removed. Release version numbers follow [semver](https://semver.org/).
+reconciler.io runtime is rapidly evolving. While we strive for API compatability between releases, functionality that is better handled using a different API may be removed. Release version numbers follow [semver](https://semver.org/).
 
 ### Current Deprecations
 
@@ -1084,11 +1084,13 @@ Backwards support may be removed in a future release, users are encouraged to mi
 
 ## Contributing
 
-The reconciler-runtime project team welcomes contributions from the community. If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will update the issue when you open a Pull Request. For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq). For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
+The reconciler.io runtime project team welcomes contributions from the community. If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will update the issue when you open a Pull Request. For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq). For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Acknowledgements
 
-`reconciler-runtime` was conceived in [`projectriff/system`](https://github.com/projectriff/system/) and implemented initially by [Scott Andrews](https://github.com/scothis), [Glyn Normington](https://github.com/glyn) and the [riff community](https://github.com/orgs/projectriff/people) at large, drawing inspiration from [Kubebuilder](https://www.kubebuilder.io) and [Knative](https://knative.dev) reconcilers.
+`reconciler-runtime` was conceived at VMware within [`projectriff/system`](https://github.com/projectriff/system/) and implemented initially by [Scott Andrews](https://github.com/scothis), [Glyn Normington](https://github.com/glyn) and the [riff community](https://github.com/orgs/projectriff/people) at large, drawing inspiration from [Kubebuilder](https://www.kubebuilder.io) and [Knative](https://knative.dev) reconcilers.
+
+All commits before (TODO this one) are copyright VMware and consumed under the Apache License v2.0, unless otherwise marked. After this point all commits are copyright of the respective author and licensed to the community under the Apache License v2.0, via a [Developer Certificate of Origin (DCO)](https://developercertificate.org).
 
 ## License
 

@@ -1,6 +1,17 @@
 /*
-Copyright 2020 VMware, Inc.
-SPDX-License-Identifier: Apache-2.0
+Copyright 2020 the original author or authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package reconcilers
@@ -29,7 +40,7 @@ type SubReconciler[Type client.Object] interface {
 }
 
 var (
-	// ErrQuiet are not logged or recorded as events within reconciler-runtime.
+	// ErrQuiet are not logged or recorded as events within reconciler.io/runtime.
 	// They are propagated as errors unless otherwise defined.
 	//
 	// Test for ErrQuiet with errors.Is(err, ErrQuiet)
@@ -48,12 +59,12 @@ var (
 	HaltSubReconcilers = ErrHaltSubReconcilers
 )
 
-const requestStashKey StashKey = "reconciler-runtime:request"
-const configStashKey StashKey = "reconciler-runtime:config"
-const originalConfigStashKey StashKey = "reconciler-runtime:originalConfig"
-const resourceTypeStashKey StashKey = "reconciler-runtime:resourceType"
-const originalResourceTypeStashKey StashKey = "reconciler-runtime:originalResourceType"
-const additionalConfigsStashKey StashKey = "reconciler-runtime:additionalConfigs"
+const requestStashKey StashKey = "reconciler.io/runtime:request"
+const configStashKey StashKey = "reconciler.io/runtime:config"
+const originalConfigStashKey StashKey = "reconciler.io/runtime:originalConfig"
+const resourceTypeStashKey StashKey = "reconciler.io/runtime:resourceType"
+const originalResourceTypeStashKey StashKey = "reconciler.io/runtime:originalResourceType"
+const additionalConfigsStashKey StashKey = "reconciler.io/runtime:additionalConfigs"
 
 func StashRequest(ctx context.Context, req Request) context.Context {
 	return context.WithValue(ctx, requestStashKey, req)

@@ -74,6 +74,22 @@ type AdmissionWebhookAdapter[Type client.Object] struct {
 	// Typically, Reconciler is a Sequence of multiple SubReconcilers.
 	Reconciler SubReconciler[Type]
 
+	// BeforeHandle is called first thing for each admission request.  A modified context may be
+	// returned.
+	//
+	// If BeforeHandle is not defined, there is no effect.
+	//
+	// +optional
+	BeforeHandle func(ctx context.Context, req admission.Request, resp *admission.Response) context.Context
+
+	// AfterHandle is called following all work for the admission request. The response is provided
+	// and may be modified before returning.
+	//
+	// If AfterHandle is not defined, the response is returned directly.
+	//
+	// +optional
+	AfterHandle func(ctx context.Context, req admission.Request, resp *admission.Response)
+
 	Config Config
 
 	lazyInit sync.Once
@@ -87,6 +103,14 @@ func (r *AdmissionWebhookAdapter[T]) init() {
 		}
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sAdmissionWebhookAdapter", typeName(r.Type))
+		}
+		if r.BeforeHandle == nil {
+			r.BeforeHandle = func(ctx context.Context, req admission.Request, resp *admission.Response) context.Context {
+				return ctx
+			}
+		}
+		if r.AfterHandle == nil {
+			r.AfterHandle = func(ctx context.Context, req admission.Request, resp *admission.Response) {}
 		}
 	})
 }
@@ -142,6 +166,10 @@ func (r *AdmissionWebhookAdapter[T]) Handle(ctx context.Context, req admission.R
 	ctx = StashAdmissionRequest(ctx, req)
 	ctx = StashAdmissionResponse(ctx, resp)
 
+	if beforeCtx := r.BeforeHandle(ctx, req, resp); beforeCtx != nil {
+		ctx = beforeCtx
+	}
+
 	// defined for compatibility since this is not a reconciler
 	ctx = StashRequest(ctx, Request{
 		NamespacedName: types.NamespacedName{
@@ -163,6 +191,7 @@ func (r *AdmissionWebhookAdapter[T]) Handle(ctx context.Context, req admission.R
 		}
 	}
 
+	r.AfterHandle(ctx, req, resp)
 	return *resp
 }
 

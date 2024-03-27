@@ -18,6 +18,7 @@ package reconcilers_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	rtime "reconciler.io/runtime/time"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -504,6 +506,136 @@ func TestAggregateReconciler(t *testing.T) {
 				}
 
 				return ctx, nil
+			},
+		},
+		"before reconcile is called before reconcile and after the context is populated": {
+			Request: request,
+			Metadata: map[string]interface{}{
+				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
+					r := defaultAggregateReconciler(c)
+					r.BeforeReconcile = func(ctx context.Context, req reconcile.Request) (context.Context, reconcile.Result, error) {
+						c := reconcilers.RetrieveConfigOrDie(ctx)
+						// create the object manually rather than as a given
+						r := configMapCreate.
+							MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+								d.CreationTimestamp(metav1.NewTime(rtime.RetrieveNow(ctx)))
+							}).
+							DieReleasePtr()
+						err := c.Create(ctx, r)
+						return nil, reconcile.Result{}, err
+					}
+					return r
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Updated",
+					`Updated ConfigMap %q`, testName),
+			},
+			ExpectCreates: []client.Object{
+				configMapCreate,
+			},
+			ExpectUpdates: []client.Object{
+				configMapGiven.
+					AddData("foo", "bar"),
+			},
+		},
+		"before reconcile can influence the result": {
+			Request: request,
+			GivenObjects: []client.Object{
+				configMapGiven,
+			},
+			Metadata: map[string]interface{}{
+				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
+					r := defaultAggregateReconciler(c)
+					r.BeforeReconcile = func(ctx context.Context, req reconcile.Request) (context.Context, reconcile.Result, error) {
+						return nil, reconcile.Result{Requeue: true}, nil
+					}
+					return r
+				},
+			},
+			ExpectedResult: reconcile.Result{
+				Requeue: true,
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Updated",
+					`Updated ConfigMap %q`, testName),
+			},
+			ExpectUpdates: []client.Object{
+				configMapGiven.
+					AddData("foo", "bar"),
+			},
+		},
+		"before reconcile can replace the context": {
+			Request: request,
+			GivenObjects: []client.Object{
+				configMapGiven,
+			},
+			Metadata: map[string]interface{}{
+				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
+					r := defaultAggregateReconciler(c)
+					r.BeforeReconcile = func(ctx context.Context, req reconcile.Request) (context.Context, reconcile.Result, error) {
+						ctx = context.WithValue(ctx, "message", "hello world")
+						return ctx, reconcile.Result{}, nil
+					}
+					r.DesiredResource = func(ctx context.Context, resource *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+						resource.Data = map[string]string{
+							"message": ctx.Value("message").(string),
+						}
+						return resource, nil
+					}
+					return r
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Updated",
+					`Updated ConfigMap %q`, testName),
+			},
+			ExpectUpdates: []client.Object{
+				configMapGiven.
+					AddData("message", "hello world"),
+			},
+		},
+		"before reconcile errors shortcut execution": {
+			Request: request,
+			GivenObjects: []client.Object{
+				configMapGiven,
+			},
+			Metadata: map[string]interface{}{
+				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
+					r := defaultAggregateReconciler(c)
+					r.BeforeReconcile = func(ctx context.Context, req reconcile.Request) (context.Context, reconcile.Result, error) {
+						return nil, reconcile.Result{}, errors.New("test")
+					}
+					return r
+				},
+			},
+			ShouldErr: true,
+		},
+		"after reconcile can overwrite the result": {
+			Request: request,
+			GivenObjects: []client.Object{
+				configMapGiven,
+			},
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("update", "ConfigMap"),
+			},
+			Metadata: map[string]interface{}{
+				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
+					r := defaultAggregateReconciler(c)
+					r.AfterReconcile = func(ctx context.Context, req reconcile.Request, res reconcile.Result, err error) (reconcile.Result, error) {
+						// suppress error
+						return reconcile.Result{}, nil
+					}
+					return r
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeWarning, "UpdateFailed",
+					`Failed to update ConfigMap %q: inducing failure for update ConfigMap`, testName),
+			},
+			ExpectUpdates: []client.Object{
+				configMapGiven.
+					AddData("foo", "bar"),
 			},
 		},
 	}

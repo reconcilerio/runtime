@@ -20,6 +20,7 @@ Within an existing Kubebuilder or controller-runtime project, reconcilers.io may
 	- [Higher-order Reconcilers](#higher-order-reconcilers)
 		- [CastResource](#castresource)
 		- [Sequence](#sequence)
+		- [Advice](#advice)
 		- [IfThen](#ifthen)
 		- [While](#while)
 		- [TryCatch](#trycatch)
@@ -456,6 +457,33 @@ func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*b
 }
 ```
 [full source](https://github.com/projectriff/system/blob/4c3b75327bf99cc37b57ba14df4c65d21dc79d28/pkg/controllers/build/function_reconciler.go#L39-L51)
+
+#### Advice
+
+[`Advice`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Advice) is a sub reconciler for advising the lifecycle of another sub reconciler in an aspect oriented programming (AOP) style. `Before` is called before the reconciler and `After` afterward. `Around` is used between Before and After to have full control over how the reconciler is called, including suppressing the call, modifying the input or result, or calling the reconciler multiple times.
+
+**Example:**
+
+Advice can be used to control calls to the reconciler at a lower level. In this case the reconciler is called twice aggregating the results while returning immediately on error.
+
+```go
+func CallTwice(reconciler reconciler.SubReconciler[*buildv1alpha1.Function]) *reconcilers.SubReconciler[*buildv1alpha1.Function] {
+	return &reconcilers.Advice[*buildv1alpha1.Function]{
+		Reconciler: reconciler,
+		Around: func(ctx context.Context, resource *resources.TestResource, reconciler reconcilers.SubReconciler[*resources.TestResource]) (reconcile.Result, error) {
+			result := reconcilers.Result{}
+			for i := 0; i < 2; i++ {
+				if r, err := reconciler.Reconcile(ctx, resource); true {
+					result = reconcilers.AggregateResults(result, r)
+				} else if err != nil {
+					return result, err
+				}
+			}
+			return result, nil
+		},
+	}
+}
+```
 
 #### IfThen
 

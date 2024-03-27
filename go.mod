@@ -2,10 +2,7 @@ module reconciler.io/runtime
 
 go 1.21
 
-toolchain go1.21.6
-
 require (
-	dies.dev v0.10.1
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/fatih/color v1.16.0
 	github.com/go-logr/logr v1.4.1
@@ -17,6 +14,7 @@ require (
 	k8s.io/apimachinery v0.29.3
 	k8s.io/client-go v0.29.3
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
+	reconciler.io/dies v0.11.0
 	sigs.k8s.io/controller-runtime v0.17.2
 	sigs.k8s.io/yaml v1.4.0
 )

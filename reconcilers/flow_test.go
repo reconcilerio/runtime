@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
-	diemetav1 "dies.dev/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
+	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"

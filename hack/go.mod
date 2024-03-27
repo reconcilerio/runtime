@@ -2,10 +2,8 @@ module reconciler.io/runtime/hack
 
 go 1.21
 
-toolchain go1.21.6
-
 require (
-	dies.dev/diegen v0.10.1
+	reconciler.io/dies/diegen v0.11.0
 	sigs.k8s.io/controller-tools v0.14.0
 )
 

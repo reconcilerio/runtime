@@ -23,8 +23,6 @@ import (
 	"net/url"
 	"testing"
 
-	dieadmissionv1 "dies.dev/apis/admission/v1"
-	diemetav1 "dies.dev/apis/meta/v1"
 	"github.com/google/go-cmp/cmp"
 	jsonpatch "gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -34,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	dieadmissionv1 "reconciler.io/dies/apis/admission/v1"
+	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/apis"
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/internal/resources/dies"

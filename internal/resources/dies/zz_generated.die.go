@@ -22,7 +22,6 @@ limitations under the License.
 package dies
 
 import (
-	"dies.dev/apis/meta/v1"
 	json "encoding/json"
 	fmtx "fmt"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +30,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	jsonpath "k8s.io/client-go/util/jsonpath"
 	osx "os"
+	"reconciler.io/dies/apis/meta/v1"
 	apis "reconciler.io/runtime/apis"
 	"reconciler.io/runtime/internal/resources"
 	reflectx "reflect"

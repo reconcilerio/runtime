@@ -1,5 +1,3 @@
-dies.dev v0.10.1 h1:UKgYIrPRKPlvCA0PTBNjvQv1UxHwgzD22QKC5ByoBds=
-dies.dev v0.10.1/go.mod h1:7gwWOuo9E63wlQ8xso6uLX0jcqgQQVp6X0AYe+UhAl8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cespare/xxhash/v2 v2.2.0 h1:DC2CZ1Ep5Y4k3ZQ899DldepgrayRUGE6BBZ/cd9Cj44=
@@ -207,6 +205,8 @@ k8s.io/kube-openapi v0.0.0-20240126223410-2919ad4fcfec h1:iGTel2aR8vCZdxJDgmbeY0
 k8s.io/kube-openapi v0.0.0-20240126223410-2919ad4fcfec/go.mod h1:Pa1PvrP7ACSkuX6I7KYomY6cmMA0Tx86waBhDUgoKPw=
 k8s.io/utils v0.0.0-20240102154912-e7106e64919e h1:eQ/4ljkx21sObifjzXwlPKpdGLrCfRziVtos3ofG/sQ=
 k8s.io/utils v0.0.0-20240102154912-e7106e64919e/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+reconciler.io/dies v0.11.0 h1:gfhOPxB/+V1Pqwr94krtAcQTksnYl8G4YAwDtElSzz4=
+reconciler.io/dies v0.11.0/go.mod h1:jL6xrLwWP/BZm17LIH5WPnYq+//ZD/7srVBnPVHqM4Q=
 sigs.k8s.io/controller-runtime v0.17.2 h1:FwHwD1CTUemg0pW2otk7/U5/i5m2ymzvOXdbeGOUvw0=
 sigs.k8s.io/controller-runtime v0.17.2/go.mod h1:+MngTvIQQQhfXtwfdGw/UOQ/aIaqsYywfCINOtwMO/s=
 sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=

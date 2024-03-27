@@ -680,7 +680,7 @@ While `controller-runtime` focuses its testing efforts on integration testing by
 
 The table test pattern is used to declare each test case in a test suite with the resource being reconciled, other given resources in the cluster, and all expected resource mutations (create, update, delete).
 
-The tests make extensive use of given and mutated resources. It is recommended to use a library like [dies](https://dies.dev) to reduce boilerplate code and to highlight the delta unique to each test.
+The tests make extensive use of given and mutated resources. It is recommended to use a library like [dies](https://reconciler.io/dies) to reduce boilerplate code and to highlight the delta unique to each test.
 
 There are three test suites: for [testing reconcilers](#reconcilertests), an optimized harness for [testing sub reconcilers](#subreconcilertests), and for [testing admission webhooks](#admissionwebhooktests).
 
@@ -721,7 +721,7 @@ rts := rtesting.ReconcilerTests{
 			gatewayCreate,
 		},
 		ExpectStatusUpdates: []client.Object{
-			// example using an https://dies.dev style die to mutate the resource
+			// example using an https://reconciler.io/dies style die to mutate the resource
 			inMemoryGateway.
 				StatusDie(func(d *diestreamingv1alpha1.InMemoryGatewayStatusDie) {
 					d.ObservedGeneration(1)

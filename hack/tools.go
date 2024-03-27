@@ -5,6 +5,6 @@
 package tools
 
 import (
-	_ "dies.dev/diegen"
+	_ "reconciler.io/dies/diegen"
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 )

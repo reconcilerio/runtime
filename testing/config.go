@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -437,9 +436,6 @@ var (
 		str := p.String()
 		return str != "" && !strings.HasPrefix(str, "Status")
 	}, cmp.Ignore())
-
-	// Deprecated: use reconcilers.IgnoreAllUnexported instead
-	SafeDeployDiff = cmpopts.IgnoreUnexported(resource.Quantity{})
 
 	NormalizeLabelSelector = cmp.Transformer("labels.Selector", func(s labels.Selector) *string {
 		if s == nil || s.Empty() {

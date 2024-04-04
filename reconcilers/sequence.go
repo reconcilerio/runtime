@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"reconciler.io/runtime/trace"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +50,9 @@ func (r Sequence[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bld
 }
 
 func (r Sequence[T]) Reconcile(ctx context.Context, resource T) (Result, error) {
+	trace.Enter(ctx, "Sequence")
+	defer trace.Exit(ctx)
+
 	aggregateResult := Result{}
 	for i, reconciler := range r {
 		log := logr.FromContextOrDiscard(ctx).

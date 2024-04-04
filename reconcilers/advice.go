@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	"reconciler.io/runtime/trace"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -136,6 +137,9 @@ func (r *Advice[T]) Reconcile(ctx context.Context, resource T) (Result, error) {
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	// before phase
 	beforeCtx, result, err := r.Before(ctx, resource)

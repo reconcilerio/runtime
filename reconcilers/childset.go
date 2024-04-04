@@ -26,6 +26,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/trace"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -293,6 +294,9 @@ func (r *ChildSetReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	knownChildren, err := r.knownChildren(ctx, resource)
 	if err != nil {

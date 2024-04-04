@@ -31,12 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"reconciler.io/runtime/internal"
-	rtime "reconciler.io/runtime/time"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"reconciler.io/runtime/internal"
+	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/trace"
 )
 
 // AdmissionWebhookAdapter allows using sub reconcilers to process admission webhooks. The full
@@ -89,6 +91,11 @@ type AdmissionWebhookAdapter[Type client.Object] struct {
 	//
 	// +optional
 	AfterHandle func(ctx context.Context, req admission.Request, resp *admission.Response)
+
+	// TraceProvider provides a new tracer for the current webhook request.
+	//
+	// +optional
+	TraceProvider trace.TraceProvider
 
 	Config Config
 
@@ -153,6 +160,10 @@ func (r *AdmissionWebhookAdapter[T]) Handle(ctx context.Context, req admission.R
 			"operation", req.Operation,
 		)
 	ctx = logr.NewContext(ctx, log)
+
+	ctx = trace.StashTracerFromProvider(ctx, r.TraceProvider)
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	resp := &admission.Response{
 		AdmissionResponse: admissionv1.AdmissionResponse{

@@ -41,6 +41,7 @@ import (
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/trace"
 )
 
 var (
@@ -98,6 +99,11 @@ type ResourceReconciler[Type client.Object] struct {
 	//
 	// +optional
 	AfterReconcile func(ctx context.Context, req Request, res Result, err error) (Result, error)
+
+	// TraceProvider provides a new tracer for the current reconcile request.
+	//
+	// +optional
+	TraceProvider trace.TraceProvider
 
 	Config Config
 
@@ -219,8 +225,6 @@ func (r *ResourceReconciler[T]) validate(ctx context.Context) error {
 func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Result, error) {
 	r.init()
 
-	ctx = WithStash(ctx)
-
 	c := r.Config
 
 	log := logr.FromContextOrDiscard(ctx).
@@ -228,6 +232,11 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 		WithValues("resourceType", gvk(c, r.Type))
 	ctx = logr.NewContext(ctx, log)
 
+	ctx = trace.StashTracerFromProvider(ctx, r.TraceProvider)
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
+
+	ctx = WithStash(ctx)
 	ctx = rtime.StashNow(ctx, time.Now())
 	ctx = StashRequest(ctx, req)
 	ctx = StashConfig(ctx, c)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +37,8 @@ var (
 // WithFinalizer ensures the resource being reconciled has the desired finalizer set so that state
 // can be cleaned up upon the resource being deleted. The finalizer is added to the resource, if not
 // already set, before calling the nested reconciler. When the resource is terminating, the
-// finalizer is cleared after returning from the nested reconciler without error.
+// finalizer is cleared after returning from the nested reconciler without error and
+// ReadyToClearFinalizer returns true.
 type WithFinalizer[Type client.Object] struct {
 	// Name used to identify this reconciler.  Defaults to `WithFinalizer`.  Ideally unique, but
 	// not required to be so.
@@ -52,16 +54,37 @@ type WithFinalizer[Type client.Object] struct {
 	// is fully deleted. This commonly include state allocated outside of the current cluster.
 	Finalizer string
 
+	// ReadyToClearFinalizer must return true before the finalizer is cleared from the resource.
+	// Only called when the resource is terminating.
+	//
+	// Defaults to always return true.
+	//
+	// +optional
+	ReadyToClearFinalizer func(ctx context.Context, resource Type) bool
+
 	// Reconciler is called for each reconciler request with the reconciled
 	// resource being reconciled. Typically a Sequence is used to compose
 	// multiple SubReconcilers.
 	Reconciler SubReconciler[Type]
+
+	initOnce sync.Once
+}
+
+func (r *WithFinalizer[T]) init() {
+	r.initOnce.Do(func() {
+		if r.Name == "" {
+			r.Name = "WithFinalizer"
+		}
+		if r.ReadyToClearFinalizer == nil {
+			r.ReadyToClearFinalizer = func(ctx context.Context, resource T) bool {
+				return true
+			}
+		}
+	})
 }
 
 func (r *WithFinalizer[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
-	if r.Name == "" {
-		r.Name = "WithFinalizer"
-	}
+	r.init()
 
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
@@ -88,6 +111,8 @@ func (r *WithFinalizer[T]) validate(ctx context.Context) error {
 }
 
 func (r *WithFinalizer[T]) Reconcile(ctx context.Context, resource T) (Result, error) {
+	r.init()
+
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
@@ -101,7 +126,7 @@ func (r *WithFinalizer[T]) Reconcile(ctx context.Context, resource T) (Result, e
 	if err != nil {
 		return result, err
 	}
-	if resource.GetDeletionTimestamp() != nil {
+	if resource.GetDeletionTimestamp() != nil && r.ReadyToClearFinalizer(ctx, resource) {
 		if err := ClearFinalizer(ctx, resource, r.Finalizer); err != nil {
 			return Result{}, err
 		}

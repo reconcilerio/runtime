@@ -105,6 +105,31 @@ func TestWithFinalizer(t *testing.T) {
 				},
 			},
 		},
+		"keep finalizer until ready": {
+			Resource: resource.
+				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.DeletionTimestamp(now)
+					d.Finalizers(testFinalizer)
+				}).
+				DieReleasePtr(),
+			ExpectResource: resource.
+				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.DeletionTimestamp(now)
+					d.Finalizers(testFinalizer)
+				}).
+				DieReleasePtr(),
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Finalize", ""),
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "ReadyToClearFinalizer", "not ready"),
+			},
+			Metadata: map[string]interface{}{
+				"ReadyToClearFinalizer": func(ctx context.Context, resource *resources.TestResource) bool {
+					c := reconcilers.RetrieveConfigOrDie(ctx)
+					c.Recorder.Event(resource, corev1.EventTypeNormal, "ReadyToClearFinalizer", "not ready")
+					return false
+				},
+			},
+		},
 		"clear finalizer": {
 			Resource: resource.
 				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
@@ -186,9 +211,14 @@ func TestWithFinalizer(t *testing.T) {
 		if err, ok := rtc.Metadata["FinalizerError"]; ok {
 			finalizeErr = err.(error)
 		}
+		var readyToClearFinalizer func(context.Context, *resources.TestResource) bool
+		if ready, ok := rtc.Metadata["ReadyToClearFinalizer"]; ok {
+			readyToClearFinalizer = ready.(func(context.Context, *resources.TestResource) bool)
+		}
 
 		return &reconcilers.WithFinalizer[*resources.TestResource]{
-			Finalizer: testFinalizer,
+			Finalizer:             testFinalizer,
+			ReadyToClearFinalizer: readyToClearFinalizer,
 			Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
 				Sync: func(ctx context.Context, resource *resources.TestResource) error {
 					c.Recorder.Event(resource, corev1.EventTypeNormal, "Sync", "")

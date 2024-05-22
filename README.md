@@ -588,7 +588,9 @@ func SwapRESTConfig(rc *rest.Config) *reconcilers.SubReconciler[*resources.MyRes
 
 #### WithFinalizer
 
-[`WithFinalizer`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#WithFinalizer) allows external state to be allocated and then cleaned up once the resource is deleted. When the resource is not terminating, the finalizer is set on the reconciled resource before the nested reconciler is called. When the resource is terminating, the finalizer is cleared only after the nested reconciler returns without an error.
+[`WithFinalizer`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#WithFinalizer) allows external state to be allocated and then cleaned up once the resource is deleted. When the resource is not terminating, the finalizer is set on the reconciled resource before the nested reconciler is called. When the resource is terminating, the finalizer is cleared only after the nested reconciler returns without an error and `ReadyToClearFinalizer` returns `true`.
+
+`ReadyToClearFinalizer` can be used to define custom rules for clearing the finalizer. For example, deletion of a resource can be blocked until all child resources are fully deleted replicating the behavior of an owner reference in parent-child relationships that are not supported by owner references. Client lookups and advanced logic should be avoided as errors cannot be returned. Computed values can be retrieved that were stashed from a previous reconciler, like a [`SyncReconciler#Finalize`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#SyncReconciler.Finalize) hook.
 
 The [Finalizers](#finalizers) utilities are used to manage the finalizer on the reconciled resource.
 

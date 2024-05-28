@@ -104,6 +104,22 @@ type AggregateReconciler[Type client.Object] struct {
 	// +optional
 	Sanitize func(resource Type) interface{}
 
+	// BeforeReconcile is called first thing for each reconcile request.  A modified context may be
+	// returned.  Errors are returned immediately.
+	//
+	// If BeforeReconcile is not defined, there is no effect.
+	//
+	// +optional
+	BeforeReconcile func(ctx context.Context, req Request) (context.Context, Result, error)
+
+	// AfterReconcile is called following all work for the reconcile request. The result and error
+	// are provided and may be modified before returning.
+	//
+	// If AfterReconcile is not defined, the result and error are returned directly.
+	//
+	// +optional
+	AfterReconcile func(ctx context.Context, req Request, res Result, err error) (Result, error)
+
 	Config Config
 
 	// stamp manages the lifecycle of the aggregated resource.
@@ -126,6 +142,16 @@ func (r *AggregateReconciler[T]) init() {
 		if r.DesiredResource == nil {
 			r.DesiredResource = func(ctx context.Context, resource T) (T, error) {
 				return resource, nil
+			}
+		}
+		if r.BeforeReconcile == nil {
+			r.BeforeReconcile = func(ctx context.Context, req reconcile.Request) (context.Context, reconcile.Result, error) {
+				return ctx, Result{}, nil
+			}
+		}
+		if r.AfterReconcile == nil {
+			r.AfterReconcile = func(ctx context.Context, req reconcile.Request, res reconcile.Result, err error) (reconcile.Result, error) {
+				return res, err
 			}
 		}
 
@@ -231,6 +257,23 @@ func (r *AggregateReconciler[T]) Reconcile(ctx context.Context, req Request) (Re
 	ctx = StashOriginalResourceType(ctx, r.Type)
 	ctx = StashResourceType(ctx, r.Type)
 
+	beforeCtx, beforeResult, err := r.BeforeReconcile(ctx, req)
+	if err != nil {
+		return beforeResult, err
+	}
+	if beforeCtx != nil {
+		ctx = beforeCtx
+	}
+
+	reconcileResult, err := r.reconcile(ctx, req)
+
+	return r.AfterReconcile(ctx, req, AggregateResults(beforeResult, reconcileResult), err)
+}
+
+func (r *AggregateReconciler[T]) reconcile(ctx context.Context, req Request) (Result, error) {
+	log := logr.FromContextOrDiscard(ctx)
+	c := RetrieveConfigOrDie(ctx)
+
 	resource := r.Type.DeepCopyObject().(T)
 	if err := c.Get(ctx, req.NamespacedName, resource); err != nil {
 		if apierrs.IsNotFound(err) {
@@ -264,13 +307,10 @@ func (r *AggregateReconciler[T]) Reconcile(ctx context.Context, req Request) (Re
 	})
 	desired, err := r.desiredResource(ctx, resource)
 	if err != nil {
-		return Result{}, err
+		return result, err
 	}
 	_, err = r.stamp.Manage(ctx, resource, resource, desired)
-	if err != nil {
-		return Result{}, err
-	}
-	return result, nil
+	return result, err
 }
 
 func (r *AggregateReconciler[T]) desiredResource(ctx context.Context, resource T) (T, error) {

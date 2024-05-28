@@ -18,6 +18,7 @@ package reconcilers_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -34,6 +35,7 @@ import (
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	rtime "reconciler.io/runtime/time"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -861,11 +863,12 @@ func TestResourceReconciler(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = resources.AddToScheme(scheme)
 
-	resource := dies.TestResourceBlank.
+	createResource := dies.TestResourceBlank.
 		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 			d.Namespace(testNamespace)
 			d.Name(testName)
-		}).
+		})
+	givenResource := createResource.
 		StatusDie(func(d *dies.TestResourceStatusDie) {
 			d.ConditionsDie(
 				diemetav1.ConditionBlank.Type(apis.ConditionReady).Status(metav1.ConditionUnknown).Reason("Initializing"),
@@ -896,7 +899,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource.MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+				givenResource.MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 					d.DeletionTimestamp(&deletedAt)
 					d.Finalizers(testFinalizer)
 				}),
@@ -918,7 +921,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			WithReactors: []rtesting.ReactionFunc{
 				rtesting.InduceFailure("get", "TestResource"),
@@ -941,7 +944,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -962,7 +965,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource.StatusDie(func(d *dies.TestResourceStatusDie) {
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
 					d.ConditionsDie()
 				}),
 			},
@@ -982,11 +985,11 @@ func TestResourceReconciler(t *testing.T) {
 				},
 			},
 			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
 					`Updated status`),
 			},
 			ExpectStatusUpdates: []client.Object{
-				resource,
+				givenResource,
 			},
 		},
 		"reconciler mutated status": {
@@ -995,7 +998,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -1011,11 +1014,11 @@ func TestResourceReconciler(t *testing.T) {
 				},
 			},
 			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
 					`Updated status`),
 			},
 			ExpectStatusUpdates: []client.Object{
-				resource.StatusDie(func(d *dies.TestResourceStatusDie) {
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
 					d.AddField("Reconciler", "ran")
 				}),
 			},
@@ -1023,7 +1026,7 @@ func TestResourceReconciler(t *testing.T) {
 		"skip status updates": {
 			Request: testRequest,
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SkipStatusUpdate": true,
@@ -1046,7 +1049,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -1065,7 +1068,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -1090,11 +1093,11 @@ func TestResourceReconciler(t *testing.T) {
 				},
 			},
 			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
 					`Updated status`),
 			},
 			ExpectStatusUpdates: []client.Object{
-				resource.StatusDie(func(d *dies.TestResourceStatusDie) {
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
 					d.AddField("want", "this to run")
 				}),
 			},
@@ -1105,7 +1108,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -1130,11 +1133,11 @@ func TestResourceReconciler(t *testing.T) {
 				},
 			},
 			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
 					`Updated status`),
 			},
 			ExpectStatusUpdates: []client.Object{
-				resource.StatusDie(func(d *dies.TestResourceStatusDie) {
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
 					d.AddField("want", "this to run")
 				}),
 			},
@@ -1146,7 +1149,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			WithReactors: []rtesting.ReactionFunc{
 				rtesting.InduceFailure("update", "TestResource", rtesting.InduceFailureOpts{
@@ -1167,11 +1170,11 @@ func TestResourceReconciler(t *testing.T) {
 				},
 			},
 			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "StatusUpdateFailed",
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeWarning, "StatusUpdateFailed",
 					`Failed to update status: inducing failure for update TestResource`),
 			},
 			ExpectStatusUpdates: []client.Object{
-				resource.StatusDie(func(d *dies.TestResourceStatusDie) {
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
 					d.AddField("Reconciler", "ran")
 				}),
 			},
@@ -1183,7 +1186,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -1204,7 +1207,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -1228,7 +1231,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
@@ -1252,7 +1255,7 @@ func TestResourceReconciler(t *testing.T) {
 				&resources.TestResource{},
 			},
 			GivenObjects: []client.Object{
-				resource,
+				givenResource,
 			},
 			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.ReconcilerTestCase) (context.Context, error) {
 				key := "test-key"
@@ -1279,6 +1282,149 @@ func TestResourceReconciler(t *testing.T) {
 				return ctx, nil
 			},
 		},
+		"before reconcile is called before reconcile and after the context is populated": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			Metadata: map[string]interface{}{
+				"BeforeReconcile": func(ctx context.Context, req reconcilers.Request) (context.Context, reconcilers.Result, error) {
+					c := reconcilers.RetrieveConfigOrDie(ctx)
+					// create the object manually rather than as a given
+					r := createResource.
+						MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+							d.CreationTimestamp(metav1.NewTime(rtime.RetrieveNow(ctx)))
+						}).
+						DieReleasePtr()
+					err := c.Create(ctx, r)
+					return nil, reconcile.Result{}, err
+				},
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							if resource.Status.Fields == nil {
+								resource.Status.Fields = map[string]string{}
+							}
+							resource.Status.Fields["Reconciler"] = "ran"
+							return nil
+						},
+					}
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+					`Updated status`),
+			},
+			ExpectCreates: []client.Object{
+				createResource,
+			},
+			ExpectStatusUpdates: []client.Object{
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.AddField("Reconciler", "ran")
+				}),
+			},
+		},
+		"before reconcile can influence the result": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			Metadata: map[string]interface{}{
+				"BeforeReconcile": func(ctx context.Context, req reconcilers.Request) (context.Context, reconcilers.Result, error) {
+					return nil, reconcile.Result{Requeue: true}, nil
+				},
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							return nil
+						},
+					}
+				},
+			},
+			ExpectedResult: reconcile.Result{
+				Requeue: true,
+			},
+		},
+		"before reconcile can replace the context": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			Metadata: map[string]interface{}{
+				"BeforeReconcile": func(ctx context.Context, req reconcilers.Request) (context.Context, reconcilers.Result, error) {
+					ctx = context.WithValue(ctx, "message", "hello world")
+					return ctx, reconcile.Result{}, nil
+				},
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							if resource.Status.Fields == nil {
+								resource.Status.Fields = map[string]string{}
+							}
+							resource.Status.Fields["message"] = ctx.Value("message").(string)
+							return nil
+						},
+					}
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+					`Updated status`),
+			},
+			ExpectStatusUpdates: []client.Object{
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.AddField("message", "hello world")
+				}),
+			},
+		},
+		"before reconcile errors shortcut execution": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			Metadata: map[string]interface{}{
+				"BeforeReconcile": func(ctx context.Context, req reconcilers.Request) (context.Context, reconcilers.Result, error) {
+					return nil, reconcile.Result{}, errors.New("test")
+				},
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							t.Error("should not be called")
+							return nil
+						},
+					}
+				},
+			},
+			ShouldErr: true,
+		},
+		"after reconcile can overwrite the result": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							return errors.New("test")
+						},
+					}
+				},
+				"AfterReconcile": func(ctx context.Context, req reconcile.Request, res reconcile.Result, err error) (reconcile.Result, error) {
+					// suppress error
+					return reconcile.Result{}, nil
+				},
+			},
+		},
 	}
 
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.ReconcilerTestCase, c reconcilers.Config) reconcile.Reconciler {
@@ -1286,9 +1432,19 @@ func TestResourceReconciler(t *testing.T) {
 		if skip, ok := rtc.Metadata["SkipStatusUpdate"].(bool); ok {
 			skipStatusUpdate = skip
 		}
+		var beforeReconcile func(context.Context, reconcilers.Request) (context.Context, reconcilers.Result, error)
+		if before, ok := rtc.Metadata["BeforeReconcile"].(func(context.Context, reconcilers.Request) (context.Context, reconcilers.Result, error)); ok {
+			beforeReconcile = before
+		}
+		var afterReconcile func(context.Context, reconcilers.Request, reconcilers.Result, error) (reconcilers.Result, error)
+		if after, ok := rtc.Metadata["AfterReconcile"].(func(context.Context, reconcilers.Request, reconcilers.Result, error) (reconcilers.Result, error)); ok {
+			afterReconcile = after
+		}
 		return &reconcilers.ResourceReconciler[*resources.TestResource]{
 			Reconciler:       rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c),
 			SkipStatusUpdate: skipStatusUpdate,
+			BeforeReconcile:  beforeReconcile,
+			AfterReconcile:   afterReconcile,
 			Config:           c,
 		}
 	})

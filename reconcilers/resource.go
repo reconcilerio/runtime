@@ -83,6 +83,22 @@ type ResourceReconciler[Type client.Object] struct {
 	// returned.
 	Reconciler SubReconciler[Type]
 
+	// BeforeReconcile is called first thing for each reconcile request.  A modified context may be
+	// returned.  Errors are returned immediately.
+	//
+	// If BeforeReconcile is not defined, there is no effect.
+	//
+	// +optional
+	BeforeReconcile func(ctx context.Context, req Request) (context.Context, Result, error)
+
+	// AfterReconcile is called following all work for the reconcile request. The result and error
+	// are provided and may be modified before returning.
+	//
+	// If AfterReconcile is not defined, the result and error are returned directly.
+	//
+	// +optional
+	AfterReconcile func(ctx context.Context, req Request, res Result, err error) (Result, error)
+
 	Config Config
 
 	lazyInit sync.Once
@@ -96,6 +112,16 @@ func (r *ResourceReconciler[T]) init() {
 		}
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sResourceReconciler", typeName(r.Type))
+		}
+		if r.BeforeReconcile == nil {
+			r.BeforeReconcile = func(ctx context.Context, req reconcile.Request) (context.Context, reconcile.Result, error) {
+				return ctx, Result{}, nil
+			}
+		}
+		if r.AfterReconcile == nil {
+			r.AfterReconcile = func(ctx context.Context, req reconcile.Request, res reconcile.Result, err error) (reconcile.Result, error) {
+				return res, err
+			}
 		}
 	})
 }
@@ -208,6 +234,24 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 	ctx = StashOriginalConfig(ctx, c)
 	ctx = StashOriginalResourceType(ctx, r.Type)
 	ctx = StashResourceType(ctx, r.Type)
+
+	beforeCtx, beforeResult, err := r.BeforeReconcile(ctx, req)
+	if err != nil {
+		return beforeResult, err
+	}
+	if beforeCtx != nil {
+		ctx = beforeCtx
+	}
+
+	reconcileResult, err := r.reconcileOuter(ctx, req)
+
+	return r.AfterReconcile(ctx, req, AggregateResults(beforeResult, reconcileResult), err)
+}
+
+func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request) (Result, error) {
+	log := logr.FromContextOrDiscard(ctx)
+	c := RetrieveOriginalConfigOrDie(ctx)
+
 	originalResource := r.Type.DeepCopyObject().(T)
 
 	if err := c.Get(ctx, req.NamespacedName, originalResource); err != nil {
@@ -220,6 +264,7 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 		if !errors.Is(err, ErrQuiet) {
 			log.Error(err, "unable to fetch resource")
 		}
+
 		return Result{}, err
 	}
 	resource := originalResource.DeepCopyObject().(T)
@@ -230,7 +275,7 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 	}
 
 	r.initializeConditions(ctx, resource)
-	result, err := r.reconcile(ctx, resource)
+	result, err := r.reconcileInner(ctx, resource)
 
 	if r.SkipStatusUpdate {
 		return result, err
@@ -251,7 +296,8 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 					c.Recorder.Eventf(resource, corev1.EventTypeWarning, "StatusPatchFailed",
 						"Failed to patch status: %v", patchErr)
 				}
-				return Result{}, patchErr
+
+				return result, patchErr
 			}
 			c.Recorder.Eventf(resource, corev1.EventTypeNormal, "StatusPatched",
 				"Patched status")
@@ -264,7 +310,7 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 					c.Recorder.Eventf(resource, corev1.EventTypeWarning, "StatusUpdateFailed",
 						"Failed to update status: %v", updateErr)
 				}
-				return Result{}, updateErr
+				return result, updateErr
 			}
 			c.Recorder.Eventf(resource, corev1.EventTypeNormal, "StatusUpdated",
 				"Updated status")
@@ -275,7 +321,7 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 	return result, err
 }
 
-func (r *ResourceReconciler[T]) reconcile(ctx context.Context, resource T) (Result, error) {
+func (r *ResourceReconciler[T]) reconcileInner(ctx context.Context, resource T) (Result, error) {
 	if resource.GetDeletionTimestamp() != nil && len(resource.GetFinalizers()) == 0 {
 		// resource is being deleted and has no pending finalizers, nothing to do
 		return Result{}, nil

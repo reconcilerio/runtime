@@ -1182,6 +1182,86 @@ func TestOverrideSetup_validate(t *testing.T) {
 	}
 }
 
+func TestAdvice_validate(t *testing.T) {
+	tests := []struct {
+		name       string
+		resource   client.Object
+		reconciler *Advice[*corev1.ConfigMap]
+		shouldErr  string
+	}{
+		{
+			name:       "empty",
+			resource:   &corev1.ConfigMap{},
+			reconciler: &Advice[*corev1.ConfigMap]{},
+			shouldErr:  `Advice "" must implement Reconciler`,
+		},
+		{
+			name:     "reconciler only",
+			resource: &corev1.ConfigMap{},
+			reconciler: &Advice[*corev1.ConfigMap]{
+				Reconciler: &SyncReconciler[*corev1.ConfigMap]{},
+			},
+			shouldErr: `Advice "" must implement at least one of Before, Around or After`,
+		},
+		{
+			name:     "valid",
+			resource: &corev1.ConfigMap{},
+			reconciler: &Advice[*corev1.ConfigMap]{
+				Reconciler: &SyncReconciler[*corev1.ConfigMap]{},
+				Before: func(ctx context.Context, resource *corev1.ConfigMap) (context.Context, reconcile.Result, error) {
+					return nil, reconcile.Result{}, nil
+				},
+				Around: func(ctx context.Context, resource *corev1.ConfigMap, reconciler SubReconciler[*corev1.ConfigMap]) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+				After: func(ctx context.Context, resource *corev1.ConfigMap, result reconcile.Result, err error) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "valid before",
+			resource: &corev1.ConfigMap{},
+			reconciler: &Advice[*corev1.ConfigMap]{
+				Reconciler: &SyncReconciler[*corev1.ConfigMap]{},
+				Before: func(ctx context.Context, resource *corev1.ConfigMap) (context.Context, reconcile.Result, error) {
+					return nil, reconcile.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "valid around",
+			resource: &corev1.ConfigMap{},
+			reconciler: &Advice[*corev1.ConfigMap]{
+				Reconciler: &SyncReconciler[*corev1.ConfigMap]{},
+				Around: func(ctx context.Context, resource *corev1.ConfigMap, reconciler SubReconciler[*corev1.ConfigMap]) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "valid after",
+			resource: &corev1.ConfigMap{},
+			reconciler: &Advice[*corev1.ConfigMap]{
+				Reconciler: &SyncReconciler[*corev1.ConfigMap]{},
+				After: func(ctx context.Context, resource *corev1.ConfigMap, result reconcile.Result, err error) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := StashResourceType(context.TODO(), c.resource)
+			err := c.reconciler.validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+		})
+	}
+}
+
 var _ logr.LogSink = &bufferedSink{}
 
 type bufferedSink struct {

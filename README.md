@@ -460,11 +460,11 @@ func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*b
 
 #### Advice
 
-[`Advice`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Advice) is a sub reconciler for advising the lifecycle of another sub reconciler in an aspect oriented programming (AOP) style. `Before` is called before the reconciler and `After` afterward. `Around` is used between Before and After to have full control over how the reconciler is called, including suppressing the call, modifying the input or result, or calling the reconciler multiple times.
+[`Advice`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Advice) is a sub reconciler for advising the lifecycle of another sub reconciler in an aspect oriented programming (AOP) style. `Before` is called before the delegated reconciler and `After` afterward. `Around` is used between Before and After to have full control over how the delegated reconciler is called, including suppressing the call, modifying the input or result, or calling the reconciler multiple times.
 
 **Example:**
 
-Advice can be used to control calls to the reconciler at a lower level. In this case the reconciler is called twice aggregating the results while returning immediately on error.
+Advice can be used to control calls to a reconciler at a lower level. In this case the reconciler is called twice aggregating the results while returning immediately on error.
 
 ```go
 func CallTwice(reconciler reconciler.SubReconciler[*buildv1alpha1.Function]) *reconcilers.SubReconciler[*buildv1alpha1.Function] {

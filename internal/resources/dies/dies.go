@@ -18,7 +18,6 @@ package dies
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	diecorev1 "reconciler.io/dies/apis/core/v1"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/internal/resources"
 )
@@ -27,6 +26,7 @@ import (
 type _ = resources.TestResource
 
 // +die
+// +die:field:name=Template,package=_/core/v1,die=PodTemplateSpecDie
 type _ = resources.TestResourceSpec
 
 func (d *TestResourceSpecDie) AddField(key, value string) *TestResourceSpecDie {
@@ -35,14 +35,6 @@ func (d *TestResourceSpecDie) AddField(key, value string) *TestResourceSpecDie {
 			r.Fields = map[string]string{}
 		}
 		r.Fields[key] = value
-	})
-}
-
-func (d *TestResourceSpecDie) TemplateDie(fn func(d *diecorev1.PodTemplateSpecDie)) *TestResourceSpecDie {
-	return d.DieStamp(func(r *resources.TestResourceSpec) {
-		d := diecorev1.PodTemplateSpecBlank.DieImmutable(false).DieFeed(r.Template)
-		fn(d)
-		r.Template = d.DieRelease()
 	})
 }
 
@@ -77,27 +69,12 @@ type _ = resources.TestResourceEmptyStatusStatus
 type _ = resources.TestResourceNoStatus
 
 // +die:object=true,spec=TestResourceSpec
+// +die:field:name=Status,die=TestResourceStatusDie,pointer=true
 type _ = resources.TestResourceNilableStatus
 
-// StatusDie stamps the resource's status field with a mutable die.
-func (d *TestResourceNilableStatusDie) StatusDie(fn func(d *TestResourceStatusDie)) *TestResourceNilableStatusDie {
-	return d.DieStamp(func(r *resources.TestResourceNilableStatus) {
-		d := TestResourceStatusBlank.DieImmutable(false).DieFeedPtr(r.Status)
-		fn(d)
-		r.Status = d.DieReleasePtr()
-	})
-}
-
 // +die:object=true
+// +die:field:name=Status,die=TestResourceStatusDie
 type _ = resources.TestDuck
-
-func (d *TestDuckDie) StatusDie(fn func(d *TestResourceStatusDie)) *TestDuckDie {
-	return d.DieStamp(func(r *resources.TestDuck) {
-		d := TestResourceStatusBlank.DieImmutable(false).DieFeed(r.Status)
-		fn(d)
-		r.Status = d.DieRelease()
-	})
-}
 
 // +die
 type _ = resources.TestDuckSpec
@@ -115,6 +92,7 @@ func (d *TestDuckSpecDie) AddField(key, value string) *TestDuckSpecDie {
 type _ = resources.TestResourceUnexportedFields
 
 // +die:ignore={unexportedFields}
+// +die:field:name=Template,package=_/core/v1,die=PodTemplateSpecDie
 type _ = resources.TestResourceUnexportedFieldsSpec
 
 func (d *TestResourceUnexportedFieldsSpecDie) AddField(key, value string) *TestResourceUnexportedFieldsSpecDie {
@@ -134,14 +112,6 @@ func (d *TestResourceUnexportedFieldsSpecDie) AddUnexportedField(key, value stri
 		}
 		f[key] = value
 		r.SetUnexportedFields(f)
-	})
-}
-
-func (d *TestResourceUnexportedFieldsSpecDie) TemplateDie(fn func(d *diecorev1.PodTemplateSpecDie)) *TestResourceUnexportedFieldsSpecDie {
-	return d.DieStamp(func(r *resources.TestResourceUnexportedFieldsSpec) {
-		d := diecorev1.PodTemplateSpecBlank.DieImmutable(false).DieFeed(r.Template)
-		fn(d)
-		r.Template = d.DieRelease()
 	})
 }
 

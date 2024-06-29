@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"reconciler.io/runtime/trace"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -123,6 +124,9 @@ func (r *SyncReconciler[T]) Reconcile(ctx context.Context, resource T) (Result, 
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	result := Result{}
 

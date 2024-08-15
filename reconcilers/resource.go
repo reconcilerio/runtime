@@ -269,7 +269,12 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 	}
 	resource := originalResource.DeepCopyObject().(T)
 
-	if defaulter, ok := client.Object(resource).(webhook.Defaulter); ok {
+	if defaulter, ok := client.Object(resource).(webhook.CustomDefaulter); ok {
+		// resource.Default(ctx, resource)
+		if err := defaulter.Default(ctx, resource); err != nil {
+			return Result{}, err
+		}
+	} else if defaulter, ok := client.Object(resource).(webhook.Defaulter); ok {
 		// resource.Default()
 		defaulter.Default()
 	}

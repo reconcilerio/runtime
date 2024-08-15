@@ -34,9 +34,9 @@ import (
 )
 
 var (
-	_ webhook.Defaulter = &TestResource{}
-	_ webhook.Validator = &TestResource{}
-	_ client.Object     = &TestResource{}
+	_ webhook.CustomDefaulter = &TestResource{}
+	_ webhook.CustomValidator = &TestResource{}
+	_ client.Object           = &TestResource{}
 )
 
 // +kubebuilder:object:root=true
@@ -50,26 +50,52 @@ type TestResource struct {
 	Status TestResourceStatus `json:"status"`
 }
 
-func (r *TestResource) Default() {
+func (*TestResource) Default(ctx context.Context, obj runtime.Object) error {
+	r, ok := obj.(*TestResource)
+	if !ok {
+		return fmt.Errorf("expected object to be TestResource")
+	}
+
 	if r.Spec.Fields == nil {
 		r.Spec.Fields = map[string]string{}
 	}
 	r.Spec.Fields["Defaulter"] = "ran"
+
+	return nil
 }
 
-func (r *TestResource) ValidateCreate() (admission.Warnings, error) {
-	return nil, r.validate().ToAggregate()
+func (*TestResource) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	r, ok := obj.(*TestResource)
+	if !ok {
+		return nil, fmt.Errorf("expected obj to be TestResource")
+	}
+
+	return nil, r.validate(ctx).ToAggregate()
 }
 
-func (r *TestResource) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	return nil, r.validate().ToAggregate()
+func (*TestResource) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	_, ok := oldObj.(*TestResource)
+	if !ok {
+		return nil, fmt.Errorf("expected oldObj to be TestResource")
+	}
+	r, ok := newObj.(*TestResource)
+	if !ok {
+		return nil, fmt.Errorf("expected newObj to be TestResource")
+	}
+
+	return nil, r.validate(ctx).ToAggregate()
 }
 
-func (r *TestResource) ValidateDelete() (admission.Warnings, error) {
+func (*TestResource) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	_, ok := obj.(*TestResource)
+	if !ok {
+		return nil, fmt.Errorf("expected obj to be TestResource")
+	}
+
 	return nil, nil
 }
 
-func (r *TestResource) validate() field.ErrorList {
+func (r *TestResource) validate(ctx context.Context) field.ErrorList {
 	errs := field.ErrorList{}
 
 	if r.Spec.Fields != nil {

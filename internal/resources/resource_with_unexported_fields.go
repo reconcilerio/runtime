@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -32,9 +33,9 @@ import (
 )
 
 var (
-	_ webhook.Defaulter = &TestResourceUnexportedFields{}
-	_ webhook.Validator = &TestResourceUnexportedFields{}
-	_ client.Object     = &TestResourceUnexportedFields{}
+	_ webhook.CustomDefaulter = &TestResourceUnexportedFields{}
+	_ webhook.CustomValidator = &TestResourceUnexportedFields{}
+	_ client.Object           = &TestResourceUnexportedFields{}
 )
 
 // +kubebuilder:object:root=true
@@ -48,26 +49,51 @@ type TestResourceUnexportedFields struct {
 	Status TestResourceUnexportedFieldsStatus `json:"status"`
 }
 
-func (r *TestResourceUnexportedFields) Default() {
+func (*TestResourceUnexportedFields) Default(ctx context.Context, obj runtime.Object) error {
+	r, ok := obj.(*TestResourceUnexportedFields)
+	if !ok {
+		return fmt.Errorf("expected obj to be TestResourceUnexportedFields")
+	}
 	if r.Spec.Fields == nil {
 		r.Spec.Fields = map[string]string{}
 	}
 	r.Spec.Fields["Defaulter"] = "ran"
+
+	return nil
 }
 
-func (r *TestResourceUnexportedFields) ValidateCreate() (admission.Warnings, error) {
-	return nil, r.validate().ToAggregate()
+func (*TestResourceUnexportedFields) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	r, ok := obj.(*TestResourceUnexportedFields)
+	if !ok {
+		return nil, fmt.Errorf("expected obj to be TestResourceUnexportedFields")
+	}
+
+	return nil, r.validate(ctx).ToAggregate()
 }
 
-func (r *TestResourceUnexportedFields) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	return nil, r.validate().ToAggregate()
+func (*TestResourceUnexportedFields) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	_, ok := oldObj.(*TestResourceUnexportedFields)
+	if !ok {
+		return nil, fmt.Errorf("expected oldObj to be TestResourceUnexportedFields")
+	}
+	r, ok := newObj.(*TestResourceUnexportedFields)
+	if !ok {
+		return nil, fmt.Errorf("expected newObj to be TestResourceUnexportedFields")
+	}
+
+	return nil, r.validate(ctx).ToAggregate()
 }
 
-func (r *TestResourceUnexportedFields) ValidateDelete() (admission.Warnings, error) {
+func (*TestResourceUnexportedFields) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	_, ok := obj.(*TestResourceUnexportedFields)
+	if !ok {
+		return nil, fmt.Errorf("expected obj to be TestResourceUnexportedFields")
+	}
+
 	return nil, nil
 }
 
-func (r *TestResourceUnexportedFields) validate() field.ErrorList {
+func (r *TestResourceUnexportedFields) validate(ctx context.Context) field.ErrorList {
 	errs := field.ErrorList{}
 
 	if r.Spec.Fields != nil {

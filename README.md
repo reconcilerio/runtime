@@ -43,7 +43,10 @@ Within an existing Kubebuilder or controller-runtime project, reconcilers.io may
 	- [Time](#time)
 - [Breaking Changes](#breaking-changes)
 	- [Current Deprecations](#current-deprecations)
-- [Contributing](#contributing)
+- [Community](#community)
+	- [Code of Conduct](#code-of-conduct)
+	- [Communication](#communication)
+	- [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
 
@@ -1112,9 +1115,19 @@ Backwards support may be removed in a future release, users are encouraged to mi
 - `ConditionSet#Manage` is deprecated in favor of `ConditionSet#ManageWithContext`.
 - `HaltSubReconcilers` is deprecated in favor of `ErrHaltSubReconcilers`.
 
-## Contributing
+## Community
 
-The reconciler.io runtime project team welcomes contributions from the community. If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will update the issue when you open a Pull Request. For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq). For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
+### Code of Conduct
+
+The reconciler.io projects follow the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md). In short, be kind and treat others with respect.
+
+### Communication
+
+General discussion and questions about the project can occur either on the Kubernetes Slack [#reconcilerio](https://kubernetes.slack.com/archives/C07J5G9NDHR) channel, or in the project's [GitHub discussions](https://github.com/orgs/reconcilerio/discussions). Use the channel you find most comfortable.
+
+### Contributing
+
+The reconciler.io runtime project team welcomes contributions from the community. A contributor license agreement (CLA) is not required. You own full rights to your contribution and agree to license the work to the community under the Apache License v2.0, via a [Developer Certificate of Origin (DCO)](https://developercertificate.org). For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Acknowledgements
 

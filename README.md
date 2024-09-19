@@ -915,19 +915,21 @@ To setup a Config for a test and make assertions that the expected behavior matc
 
 The stash allows passing arbitrary state between sub reconcilers within the scope of a single reconciler request. Values are stored on the context by [`StashValue`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#StashValue) and accessed via [`RetrieveValue`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveValue).
 
+A [`Stasher`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Stasher) provides a convenient way to interact with typed values. Create a [`NewStasher`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#NewStasher) using the type of the value being stashed and a unique stash key. All operations through a stasher, including retrieval are type safe with options for handling missing values on retrieval.
+
 For testing, given stashed values can be defined in a [SubReconcilerTests](#subreconcilertests) with [`GivenStashedValues`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestCase.GivenStashedValues). Newly stashed or mutated values expectations are defined with [`ExpectStashedValues`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestCase.ExpectStashedValues). An optional, custom function for asserting stashed values can be provided via [`VerifyStashedValue`](https://pkg.go.dev/reconciler.io/runtime/testing#SubReconcilerTestCase.VerifyStashedValue).
 
 **Example:**
 
 ```go
-const exampleStashKey reconcilers.StashKey = "example"
+var exampleStasher = reconcilers.NewStasher[Example]("example")
 
 func StashExampleSubReconciler(c reconcilers.Config) reconcilers.SubReconciler[*examplev1.MyExample] {
 	return &reconcilers.SyncReconciler[*examplev1.MyExample]{
 		Name: "StashExample",
 		Sync: func(ctx context.Context, resource *examplev1.MyExample) error {
 			value := Example{} // something we want to expose to a sub reconciler later in this chain
-			reconcilers.StashValue(ctx, exampleStashKey, value)
+			exampleStasher.Store(ctx, value)
 			return nil
 		},
 	}
@@ -938,9 +940,9 @@ func StashExampleSubReconciler(c reconcilers.Config) reconcilers.SubReconciler[*
 	return &reconcilers.SyncReconciler[*examplev1.MyExample]{
 		Name: "StashExample",
 		Sync: func(ctx context.Context, resource *examplev1.MyExample) error {
-			value, ok := reconcilers.RetrieveValue(ctx, exampleStashKey).(Example)
-			if !ok {
-				return nil, fmt.Errorf("expected stashed value for key %q", exampleStashKey)
+			value, err := exampleStasher.RetrieveOrError(ctx)
+			if err == reconcilers.ErrStashValueNotFound {
+				return nil, fmt.Errorf("%w for key %q", err, exampleStasher.Key())
 			}
 			... // do something with the value
 		},

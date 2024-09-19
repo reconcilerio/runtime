@@ -18,6 +18,7 @@ package reconcilers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -53,5 +54,74 @@ func ClearValue(ctx context.Context, key StashKey) interface{} {
 	stash := retrieveStashMap(ctx)
 	value := stash[key]
 	delete(stash, key)
+	return value
+}
+
+// Stasher stores and retrieves values from the stash context. The context must be configured
+// with a stash via WithStash(). The stash is pre-configured for the context within a reconciler.
+type Stasher[T any] interface {
+	// Key is the stash key used to store and retrieve the value
+	Key() StashKey
+
+	// Store saves the value in the stash under the key
+	Store(ctx context.Context, value T)
+
+	// Clear removes the key from the stash returning the previous value, if any.
+	Clear(ctx context.Context) T
+
+	// RetrieveOrDie retrieves the value from the stash, or panics if the key is not in the stash
+	RetrieveOrDie(ctx context.Context) T
+
+	// RetrieveOrEmpty retrieves the value from the stash, or an error if the key is not in the stash
+	RetrieveOrError(ctx context.Context) (T, error)
+
+	// RetrieveOrEmpty retrieves the value from the stash, or the empty value if the key is not in the stash
+	RetrieveOrEmpty(ctx context.Context) T
+}
+
+// NewStasher creates a stasher for the value type
+func NewStasher[T any](key StashKey) Stasher[T] {
+	return &stasher[T]{
+		key: key,
+	}
+}
+
+type stasher[T any] struct {
+	key StashKey
+}
+
+func (s *stasher[T]) Key() StashKey {
+	return s.key
+}
+
+func (s *stasher[T]) Store(ctx context.Context, value T) {
+	StashValue(ctx, s.Key(), value)
+}
+
+func (s *stasher[T]) Clear(ctx context.Context) T {
+	previous, _ := ClearValue(ctx, s.Key()).(T)
+	return previous
+}
+
+func (s *stasher[T]) RetrieveOrDie(ctx context.Context) T {
+	value, err := s.RetrieveOrError(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+var ErrStashValueNotFound = errors.New("value not found in stash")
+
+func (s *stasher[T]) RetrieveOrError(ctx context.Context) (T, error) {
+	value, ok := RetrieveValue(ctx, s.Key()).(T)
+	if !ok {
+		return value, ErrStashValueNotFound
+	}
+	return value, nil
+}
+
+func (s *stasher[T]) RetrieveOrEmpty(ctx context.Context) T {
+	value, _ := s.RetrieveOrError(ctx)
 	return value
 }

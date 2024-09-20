@@ -232,13 +232,13 @@ func (r *ChildSetReconciler[T, CT, CLT]) childReconcilerFor(desired CT, desiredE
 			return desired, desiredErr
 		},
 		ReflectChildStatusOnParent: func(ctx context.Context, parent T, child CT, err error) {
-			result := retrieveChildSetResult[CT](ctx)
+			result := childSetResultStasher[CT]().RetrieveOrEmpty(ctx)
 			result.Children = append(result.Children, ChildSetPartialResult[CT]{
 				Id:    id,
 				Child: child,
 				Err:   err,
 			})
-			stashChildSetResult(ctx, result)
+			childSetResultStasher[CT]().Store(ctx, result)
 		},
 		HarmonizeImmutableFields: r.HarmonizeImmutableFields,
 		MergeBeforeUpdate:        r.MergeBeforeUpdate,
@@ -370,7 +370,7 @@ func (r *ChildSetReconciler[T, CT, CLT]) composeChildReconcilers(ctx context.Con
 }
 
 func (r *ChildSetReconciler[T, CT, CLT]) reflectStatus(ctx context.Context, parent T) {
-	result := clearChildSetResult[CT](ctx)
+	result := childSetResultStasher[CT]().Clear(ctx)
 	r.ReflectChildrenStatusOnParent(ctx, parent, result)
 }
 
@@ -392,26 +392,8 @@ func (r *ChildSetResult[T]) AggregateError() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-const childSetResultStashKey StashKey = "reconciler.io/runtime:childSetResult"
-
-func retrieveChildSetResult[T client.Object](ctx context.Context) ChildSetResult[T] {
-	value := RetrieveValue(ctx, childSetResultStashKey)
-	if result, ok := value.(ChildSetResult[T]); ok {
-		return result
-	}
-	return ChildSetResult[T]{}
-}
-
-func stashChildSetResult[T client.Object](ctx context.Context, result ChildSetResult[T]) {
-	StashValue(ctx, childSetResultStashKey, result)
-}
-
-func clearChildSetResult[T client.Object](ctx context.Context) ChildSetResult[T] {
-	value := ClearValue(ctx, childSetResultStashKey)
-	if result, ok := value.(ChildSetResult[T]); ok {
-		return result
-	}
-	return ChildSetResult[T]{}
+func childSetResultStasher[T client.Object]() Stasher[ChildSetResult[T]] {
+	return NewStasher[ChildSetResult[T]]("reconciler.io/runtime:childSetResult")
 }
 
 const knownChildrenStashKey StashKey = "reconciler.io/runtime:knownChildren"

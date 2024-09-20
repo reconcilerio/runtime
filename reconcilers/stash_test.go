@@ -47,7 +47,7 @@ func TestStash(t *testing.T) {
 	}
 
 	var key StashKey = "stash-key"
-	ctx := WithStash(context.TODO())
+	ctx := WithStash(context.Background())
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			StashValue(ctx, key, c.value)
@@ -59,7 +59,7 @@ func TestStash(t *testing.T) {
 }
 
 func TestStash_StashValue_UndecoratedContext(t *testing.T) {
-	ctx := context.TODO()
+	ctx := context.Background()
 	var key StashKey = "stash-key"
 	value := "value"
 
@@ -72,7 +72,7 @@ func TestStash_StashValue_UndecoratedContext(t *testing.T) {
 }
 
 func TestStash_RetrieveValue_UndecoratedContext(t *testing.T) {
-	ctx := context.TODO()
+	ctx := context.Background()
 	var key StashKey = "stash-key"
 
 	defer func() {
@@ -84,10 +84,87 @@ func TestStash_RetrieveValue_UndecoratedContext(t *testing.T) {
 }
 
 func TestStash_RetrieveValue_Undefined(t *testing.T) {
-	ctx := WithStash(context.TODO())
+	ctx := WithStash(context.Background())
 	var key StashKey = "stash-key"
 
 	if value := RetrieveValue(ctx, key); value != nil {
 		t.Error("expected RetrieveValue() to return nil for undefined key")
 	}
+}
+
+func TestStasher(t *testing.T) {
+	ctx := WithStash(context.Background())
+	stasher := NewStasher[string]("my-key")
+
+	if key := stasher.Key(); key != StashKey("my-key") {
+		t.Errorf("expected key to be %q got %q", StashKey("my-key"), key)
+	}
+
+	t.Run("no value", func(t *testing.T) {
+		t.Run("RetrieveOrEmpty", func(t *testing.T) {
+			if value := stasher.RetrieveOrEmpty(ctx); value != "" {
+				t.Error("expected value to be empty")
+			}
+		})
+		t.Run("RetrieveOrError", func(t *testing.T) {
+			if value, err := stasher.RetrieveOrError(ctx); err == nil {
+				t.Error("expected err")
+			} else if value != "" {
+				t.Error("expected value to be empty")
+			}
+		})
+		t.Run("RetrieveOrDie", func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					return
+				}
+				t.Errorf("expected to recover")
+			}()
+			value := stasher.RetrieveOrDie(ctx)
+			t.Errorf("expected to panic, got %q", value)
+		})
+	})
+
+	t.Run("has value", func(t *testing.T) {
+		stasher.Store(ctx, "hello world")
+		t.Run("RetrieveOrEmpty", func(t *testing.T) {
+			if value := stasher.RetrieveOrEmpty(ctx); value != "hello world" {
+				t.Errorf("expected value to be %q got %q", "hello world", value)
+			}
+		})
+		t.Run("RetrieveOrError", func(t *testing.T) {
+			if value, err := stasher.RetrieveOrError(ctx); err != nil {
+				t.Errorf("unexpected err: %s", err)
+			} else if value != "hello world" {
+				t.Errorf("expected value to be %q got %q", "hello world", value)
+			}
+		})
+		t.Run("RetrieveOrDie", func(t *testing.T) {
+			if value := stasher.RetrieveOrDie(ctx); value != "hello world" {
+				t.Errorf("expected value to be %q got %q", "hello world", value)
+			}
+		})
+	})
+
+	t.Run("context scoped", func(t *testing.T) {
+		stasher.Store(ctx, "hello world")
+		if value := stasher.RetrieveOrEmpty(ctx); value != "hello world" {
+			t.Errorf("expected value to be %q got %q", "hello world", value)
+		}
+		altCtx := WithStash(context.Background())
+		if value := stasher.RetrieveOrEmpty(altCtx); value != "" {
+			t.Error("expected value to be empty")
+		}
+	})
+
+	t.Run("Clear", func(t *testing.T) {
+		stasher.Store(ctx, "hello world")
+		if value := stasher.RetrieveOrEmpty(ctx); value != "hello world" {
+			t.Errorf("expected value to be %q got %q", "hello world", value)
+		}
+		stasher.Clear(ctx)
+		if value := stasher.RetrieveOrEmpty(ctx); value != "" {
+			t.Error("expected value to be empty")
+		}
+	})
 }

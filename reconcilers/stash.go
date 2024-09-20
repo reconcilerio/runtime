@@ -57,7 +57,7 @@ func ClearValue(ctx context.Context, key StashKey) interface{} {
 	return value
 }
 
-// Stasher stores and retrieves values from the stash context. The context must be configured
+// Stasher stores and retrieves values from the stash context. The context which gets passed to its methods must be configured
 // with a stash via WithStash(). The stash is pre-configured for the context within a reconciler.
 type Stasher[T any] interface {
 	// Key is the stash key used to store and retrieve the value

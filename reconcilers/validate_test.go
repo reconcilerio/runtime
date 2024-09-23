@@ -1065,6 +1065,61 @@ func TestWhile_validate(t *testing.T) {
 	}
 }
 
+func TestForEach_validate(t *testing.T) {
+	tests := []struct {
+		name         string
+		reconciler   *ForEach[*resources.TestResource, any]
+		shouldErr    string
+		expectedLogs []string
+	}{
+		{
+			name: "valid",
+			reconciler: &ForEach[*resources.TestResource, any]{
+				Items: func(ctx context.Context, resource *resources.TestResource) ([]any, error) {
+					return nil, nil
+				},
+				Reconciler: Sequence[*resources.TestResource]{},
+			},
+		},
+		{
+			name: "missing items",
+			reconciler: &ForEach[*resources.TestResource, any]{
+				// Items: func(ctx context.Context, resource *resources.TestResource) ([]any, error) {
+				// 	return nil, nil
+				// },
+				Reconciler: Sequence[*resources.TestResource]{},
+			},
+			shouldErr: `ForEach "missing items" must implement Items`,
+		},
+		{
+			name: "missing reconciler",
+			reconciler: &ForEach[*resources.TestResource, any]{
+				Items: func(ctx context.Context, resource *resources.TestResource) ([]any, error) {
+					return nil, nil
+				},
+				// Reconciler: Sequence[*resources.TestResource]{},
+			},
+			shouldErr: `ForEach "missing reconciler" must implement Reconciler`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			r := c.reconciler
+			r.Name = c.name
+			err := r.validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			}
+		})
+	}
+}
+
 func TestTryCatch_validate(t *testing.T) {
 	tests := []struct {
 		name         string

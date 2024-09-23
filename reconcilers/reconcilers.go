@@ -174,7 +174,6 @@ func typeName(i interface{}) string {
 	}
 
 	t := reflect.TypeOf(i)
-	// TODO do we need this?
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}

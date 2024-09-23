@@ -31,6 +31,7 @@ import (
 var (
 	_ SubReconciler[client.Object] = (*IfThen[client.Object])(nil)
 	_ SubReconciler[client.Object] = (*While[client.Object])(nil)
+	_ SubReconciler[client.Object] = (*ForEach[client.Object, any])(nil)
 	_ SubReconciler[client.Object] = (*TryCatch[client.Object])(nil)
 	_ SubReconciler[client.Object] = (*OverrideSetup[client.Object])(nil)
 )
@@ -279,6 +280,112 @@ func (r *While[T]) Reconcile(ctx context.Context, resource T) (Result, error) {
 	}
 
 	return aggregateResult, nil
+}
+
+// ForEach calls the reconcilers for each item. The current value of the iteration is exposed as a
+// Cursor that is available via the CursorStasher helper. Multiple ForEach reconcilers are nestable
+// so long as the types being iterated over are unique.
+type ForEach[Type client.Object, Item any] struct {
+	// Name used to identify this reconciler.  Defaults to `ForEach`.  Ideally unique, but
+	// not required to be so.
+	//
+	// +optional
+	Name string
+
+	// Setup performs initialization on the manager and builder this reconciler
+	// will run with. It's common to setup field indexes and watch resources.
+	//
+	// +optional
+	Setup func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error
+
+	// Reconciler to be called for each iterable item
+	Reconciler SubReconciler[Type]
+
+	// Items returns the items to iterate over
+	Items func(ctx context.Context, resource Type) ([]Item, error)
+}
+
+func (r *ForEach[T, I]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+	if r.Name == "" {
+		r.Name = "ForEach"
+	}
+
+	log := logr.FromContextOrDiscard(ctx).
+		WithName(r.Name)
+	ctx = logr.NewContext(ctx, log)
+
+	if err := r.validate(ctx); err != nil {
+		return err
+	}
+	if err := r.Reconciler.SetupWithManager(ctx, mgr, bldr); err != nil {
+		return err
+	}
+	if r.Setup == nil {
+		return nil
+	}
+	return r.Setup(ctx, mgr, bldr)
+}
+
+func (r *ForEach[T, I]) validate(ctx context.Context) error {
+	// validate Reconciler
+	if r.Reconciler == nil {
+		return fmt.Errorf("ForEach %q must implement Reconciler", r.Name)
+	}
+	if r.Items == nil {
+		return fmt.Errorf("ForEach %q must implement Items", r.Name)
+	}
+
+	return nil
+}
+
+func (r *ForEach[T, I]) Reconcile(ctx context.Context, resource T) (Result, error) {
+	log := logr.FromContextOrDiscard(ctx).
+		WithName(r.Name)
+	ctx = logr.NewContext(ctx, log)
+
+	result := Result{}
+
+	items, err := r.Items(ctx, resource)
+	if err != nil {
+		return result, err
+	}
+
+	for i := range items {
+		log := log.WithName(fmt.Sprintf("%d", i))
+		ctx := logr.NewContext(ctx, log)
+
+		CursorStasher[I]().Store(ctx, Cursor[I]{
+			Index:  i,
+			Length: len(items),
+			Item:   items[i],
+		})
+
+		iterationResult, err := r.Reconciler.Reconcile(ctx, resource)
+		if err != nil {
+			return result, err
+		}
+		result = AggregateResults(result, iterationResult)
+	}
+
+	return result, nil
+}
+
+// Cursor represents the current value within an iterator
+type Cursor[I any] struct {
+	// Index of the current iteration
+	Index int
+	// Length of the current iteration, or -1 if not known and/or unbounded
+	Length int
+	// Item of the current iteration
+	Item I
+}
+
+// CursorStasher creates a Stasher for an Cursor of the generic type
+func CursorStasher[I any]() Stasher[Cursor[I]] {
+	// avoid key collisions for nested iteration over different types
+	var empty I
+	key := StashKey(fmt.Sprintf("reconciler.io/runtime:cursor:%s", typeName(empty)))
+	return NewStasher[Cursor[I]](key)
 }
 
 // TryCatch facilitates recovery from errors encountered within the Try

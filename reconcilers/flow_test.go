@@ -22,8 +22,10 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
+	diecorev1 "reconciler.io/dies/apis/core/v1"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/internal/resources/dies"
@@ -263,6 +265,132 @@ func TestWhile(t *testing.T) {
 		}
 		if i, ok := rtc.Metadata["MaxIterations"]; ok {
 			r.MaxIterations = pointer.Int(i.(int))
+		}
+
+		return r
+	})
+}
+
+func TestForEach(t *testing.T) {
+	testNamespace := "test-namespace"
+	testName := "test-resource"
+
+	scheme := runtime.NewScheme()
+	_ = resources.AddToScheme(scheme)
+
+	resource := dies.TestResourceBlank.
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(testNamespace)
+			d.Name(testName)
+		}).
+		SpecDie(func(d *dies.TestResourceSpecDie) {
+			d.Fields(map[string]string{})
+		})
+
+	rts := rtesting.SubReconcilerTests[*resources.TestResource]{
+		"empty items": {
+			Resource:       resource.DieReleasePtr(),
+			ExpectResource: resource.DieReleasePtr(),
+		},
+		"each container": {
+			Resource: resource.
+				SpecDie(func(d *dies.TestResourceSpecDie) {
+					d.TemplateDie(func(d *diecorev1.PodTemplateSpecDie) {
+						d.SpecDie(func(d *diecorev1.PodSpecDie) {
+							d.ContainerDie("hello", func(d *diecorev1.ContainerDie) {
+								d.Image("world")
+							})
+							d.ContainerDie("foo", func(d *diecorev1.ContainerDie) {
+								d.Image("bar")
+							})
+						})
+					})
+				}).
+				DieReleasePtr(),
+			ExpectResource: resource.
+				SpecDie(func(d *dies.TestResourceSpecDie) {
+					d.TemplateDie(func(d *diecorev1.PodTemplateSpecDie) {
+						d.SpecDie(func(d *diecorev1.PodSpecDie) {
+							d.ContainerDie("hello", func(d *diecorev1.ContainerDie) {
+								d.Image("world")
+							})
+							d.ContainerDie("foo", func(d *diecorev1.ContainerDie) {
+								d.Image("bar")
+							})
+						})
+					})
+				}).
+				StatusDie(func(d *dies.TestResourceStatusDie) {
+					// container.name -> container.image-index-length
+					d.AddField("hello", "world-0-2")
+					d.AddField("foo", "bar-1-2")
+				}).
+				DieReleasePtr(),
+		},
+		"terminate iteration on error": {
+			Resource: resource.
+				SpecDie(func(d *dies.TestResourceSpecDie) {
+					d.TemplateDie(func(d *diecorev1.PodTemplateSpecDie) {
+						d.SpecDie(func(d *diecorev1.PodSpecDie) {
+							d.ContainerDie("hello", func(d *diecorev1.ContainerDie) {
+								d.Image("world")
+							})
+							d.ContainerDie("die", func(d *diecorev1.ContainerDie) {
+								d.Image("die")
+							})
+							d.ContainerDie("foo", func(d *diecorev1.ContainerDie) {
+								d.Image("bar")
+							})
+						})
+					})
+				}).
+				DieReleasePtr(),
+			ExpectResource: resource.
+				SpecDie(func(d *dies.TestResourceSpecDie) {
+					d.TemplateDie(func(d *diecorev1.PodTemplateSpecDie) {
+						d.SpecDie(func(d *diecorev1.PodSpecDie) {
+							d.ContainerDie("hello", func(d *diecorev1.ContainerDie) {
+								d.Image("world")
+							})
+							d.ContainerDie("die", func(d *diecorev1.ContainerDie) {
+								d.Image("die")
+							})
+							d.ContainerDie("foo", func(d *diecorev1.ContainerDie) {
+								d.Image("bar")
+							})
+						})
+					})
+				}).
+				StatusDie(func(d *dies.TestResourceStatusDie) {
+					// container.name -> container.image-index-length
+					d.AddField("hello", "world-0-3")
+				}).
+				DieReleasePtr(),
+			ShouldErr: true,
+		},
+	}
+
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*resources.TestResource], c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+		r := &reconcilers.ForEach[*resources.TestResource, corev1.Container]{
+			Items: func(ctx context.Context, resource *resources.TestResource) ([]corev1.Container, error) {
+				return resource.Spec.Template.Spec.Containers, nil
+			},
+			Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+				Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					cursor := reconcilers.CursorStasher[corev1.Container]().RetrieveOrDie(ctx)
+
+					if cursor.Item.Name == "die" {
+						return fmt.Errorf("exit early")
+					}
+
+					if resource.Status.Fields == nil {
+						resource.Status.Fields = map[string]string{}
+					}
+					resource.Status.Fields[cursor.Item.Name] = fmt.Sprintf("%s-%d-%d", cursor.Item.Image, cursor.Index, cursor.Length)
+
+					return nil
+				},
+			},
 		}
 
 		return r

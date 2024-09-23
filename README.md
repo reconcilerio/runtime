@@ -23,6 +23,7 @@ Within an existing Kubebuilder or controller-runtime project, reconcilers.io may
 		- [Advice](#advice)
 		- [IfThen](#ifthen)
 		- [While](#while)
+		- [ForEach](#foreach)
 		- [TryCatch](#trycatch)
 		- [OverrideSetup](#overridesetup)
 		- [WithConfig](#withconfig)
@@ -530,6 +531,45 @@ func TenTimesReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
 				// called ten times
 				return nil
 			}
+		},
+	}
+}
+```
+
+#### ForEach
+
+A [`ForEach`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ForEach) calls the reconciler for each item returned from Items. The current cursor can be retrieved with [`CursorStasher`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CursorStasher).
+
+Nested iteration is allowed so long as the types being iterated over contain unique names. Otherwise the stash keys will collide. For testing the nested reconciler outside the scope of the loop, use the stasher's Key method to lookup the StashKey, do not expect the StashKey to be stable between releases.
+
+**Example:**
+
+A ForEach can be used interact with each volume mount on a pod. 
+
+```go
+func VolumeMountReconciler() *reconcilers.SubReconciler[*corev1.Pod] {
+	containerCursorStasher := reconcilers.CursorStasher[corev1.Container]()
+	volumeMountCursorStasher := reconcilers.CursorStasher[corev1.VolumeMount]()
+
+	return &reconcilers.ForEach[*corev1.Pod, corev1.Container]{
+		Items: func(ctx context.Context, resource *corev1.Pod) ([]corev1.Container, error) {
+			return resource.Spec.Containers, nil
+		}
+		Reconciler: &reconcilers.ForEach[*corev1.Pod, corev1.VolumeMount]{
+			Items: func(ctx context.Context, resource *corev1.Pod) ([]corev1.VolumeMount, error) {
+				containerCursor := containerCursorStasher.RetrieveOrDie(ctx)
+				return containerCursor.Item.VolumeMounts, nil
+			}
+			Reconciler: reconcilers.SyncReconciler[*corev1.Pod]{
+				Sync: func(ctx context.Context, resource *corev1.Pod) error {
+					containerCursor := containerCursorStasher.RetrieveOrDie(ctx)
+					volumeMountCursor := volumeMountCursorStasher.RetrieveOrDie(ctx)
+
+					// do something
+
+					return nil
+				}
+			},
 		},
 	}
 }

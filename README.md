@@ -538,13 +538,13 @@ func TenTimesReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
 
 #### ForEach
 
-A [`ForEach`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ForEach) calls the reconciler for each item returned from Items. The current cursor can be retrieved with [`CursorStasher`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CursorStasher).
+A [`ForEach`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ForEach) calls the reconciler for each item returned from Items. A cursor marks the item being reconciled. The current cursor can be retrieved with [`CursorStasher`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CursorStasher).
 
-Nested iteration is allowed so long as the types being iterated over contain unique names. Otherwise the stash keys will collide. For testing the nested reconciler outside the scope of the loop, use the stasher's Key method to lookup the StashKey, do not expect the StashKey to be stable between releases.
+Nested iteration is allowed so long as the types being iterated over contain unique names. Otherwise the stash keys will collide. For testing the nested reconciler outside the scope of the loop, use the CursorStasher's Key method to lookup the StashKey, do not expect the StashKey to be stable between releases.
 
 **Example:**
 
-A ForEach can be used interact with each volume mount on a pod. 
+A ForEach can be used to interact with each volume mount on a pod. 
 
 ```go
 func VolumeMountReconciler() *reconcilers.SubReconciler[*corev1.Pod] {

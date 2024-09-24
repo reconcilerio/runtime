@@ -286,7 +286,7 @@ func (r *While[T]) Reconcile(ctx context.Context, resource T) (Result, error) {
 // Cursor that is available via the CursorStasher helper. Multiple ForEach reconcilers are nestable
 // so long as the types being iterated over are unique.
 type ForEach[Type client.Object, Item any] struct {
-	// Name used to identify this reconciler.  Defaults to `ForEach`.  Ideally unique, but
+	// Name used to identify this reconciler.  Defaults to `ForEach`. Ideally unique, but
 	// not required to be so.
 	//
 	// +optional
@@ -380,7 +380,7 @@ type Cursor[I any] struct {
 	Item I
 }
 
-// CursorStasher creates a Stasher for an Cursor of the generic type
+// CursorStasher creates a Stasher for a Cursor of the generic type
 func CursorStasher[I any]() Stasher[Cursor[I]] {
 	// avoid key collisions for nested iteration over different types
 	var empty I

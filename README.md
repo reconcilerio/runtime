@@ -40,7 +40,8 @@ Within an existing Kubebuilder or controller-runtime project, reconcilers.io may
 	- [Tracker](#tracker)
 	- [Status](#status)
 	- [Finalizers](#finalizers)
-	- [ResourceManager](#resourcemanager)
+	- [ObjectManager](#objectmanager)
+		- [UpdatingObjectManager](#updatingobjectmanager)
 	- [Time](#time)
 - [Breaking Changes](#breaking-changes)
 	- [Current Deprecations](#current-deprecations)
@@ -1119,17 +1120,26 @@ A minimal test case for a sub reconciler that adds a finalizer may look like:
 	...
 ```
 
-### ResourceManager
+### ObjectManager
 
-The [`ResourceManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceManager) provides a means to manage a single resource by synchronizing the current and desired state. The resource will be created if it does not exist, deleted if no longer desired and updated when semantically different. The same resource manager should be reused to manage multiple resources and must be reused when managing the same resource over time in order to take full effect. This utility is used by the [ChildReconciler](#childreconciler) and [AggregateReconciler](#aggregatereconciler).
+The [`ObjectManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ObjectManager) is an interface providing a means to manage a single resource by synchronizing the current and desired state. The resource will be created if it does not exist, deleted if no longer desired and updated when semantically different. The same resource manager should be reused to manage multiple resources and must be reused when managing the same resource over time in order to take full effect. This utility is used by the [ChildReconciler](#childreconciler), [ChildSetReconciler](#childsetreconciler) and [AggregateReconciler](#aggregatereconciler).
+
+The interface is designed to allow for multiple synchronization strategies to be used. 
 
 The `Manage(ctx context.Context, resource, actual, desired client.Object) (client.Object, error)` method take three objects and returns another object:
 - `resource` is the reconciled resource, events, tracks and finalizer are against this object. May be an object of any underlaying type.
 - `actual` the resource that exists on the API Server. Must be compatible with the `Type`.
-- `desired` the resoruce that should exist on the API Server after this call. Must be compatible with the `Type`.
+- `desired` the resource that should exist on the API Server after this call. Must be compatible with the `Type`.
 - the returned object is the value as persisted by the API Server.
 
-Internally, a mutations made to the resoruce at admission time (like defaults applied by a mutating webhook) are captured and reapplied to the desired state before checking if an update is needed. This reduces requests that are functionally a no-op but create churn on the API Server. The mutation cache is defensive and fails open to make an API request.
+Use a provided ObjectManager or define a custom strategy to change specific behavior or employ entirely new approaches to sync state to the API Server.
+
+<a name="resourcemanager">
+#### UpdatingObjectManager
+
+The [`UpdatingObjectManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#UpdatingObjectManager) (previously [`ResourceManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceManager)) uses the `client.Client#{Create, Update, Delete}` methods to synchronize state to the API Server.
+
+Internally, a mutations made to the resource at admission time (like defaults applied by a mutating webhook) are captured and reapplied to the desired state before checking if an update is needed. This reduces requests that are functionally a no-op but create churn on the API Server. The mutation cache is defensive and fails open to make an API request.
 
 If configured, a [finalizer](#finalizers) can be managed on the resource which will be added before create/udpate and removed after sucessful delete.
 
@@ -1153,6 +1163,10 @@ reconciler.io runtime is rapidly evolving. While we strive for API compatability
 
 Backwards support may be removed in a future release, users are encouraged to migrate.
 
+- `ResourceManager` is deprecated in favor of `ObjectManager` for a generic type, or `UpdatingObjectManager`.
+- `AggregateReconciler.{HarmonizeImmutableFields, MergeBeforeUpdate, Sanitize}` are deprecated in favor of `AggregateReconciler.AggregateObjectManager`.
+- `ChildReconciler.{Finalizer, HarmonizeImmutableFields, MergeBeforeUpdate, Sanitize, SetResourceManager}` are deprecated in favor of `ChildReconciler.ChildObjectManager`.
+- `ChildSetReconciler.{HarmonizeImmutableFields, MergeBeforeUpdate, Sanitize}` are deprecated in favor of `ChildSetReconciler.ChildObjectManager`.
 - status `InitializeConditions()` is deprecated in favor of `InitializeConditions(context.Context)`.
 - `ConditionSet#Manage` is deprecated in favor of `ConditionSet#ManageWithContext`.
 - `HaltSubReconcilers` is deprecated in favor of `ErrHaltSubReconcilers`.

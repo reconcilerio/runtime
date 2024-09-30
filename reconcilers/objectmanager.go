@@ -31,14 +31,27 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/cache"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"reconciler.io/runtime/internal"
 )
 
-// ResourceManager compares the actual and desired resources to create/update/delete as desired.
-type ResourceManager[Type client.Object] struct {
-	// Name used to identify this reconciler.  Defaults to `{Type}ResourceManager`.  Ideally
+// Deprecated ResourceManager use either ObjectManger for the generic type, or
+// UpdatingObjectManager for a specific instance.
+type ResourceManager[Type client.Object] UpdatingObjectManager[Type]
+
+type ObjectManager[Type client.Object] interface {
+	SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error
+	Manage(ctx context.Context, resource client.Object, actual, desired Type) (Type, error)
+}
+
+var _ ObjectManager[client.Object] = (*UpdatingObjectManager[client.Object])(nil)
+
+// UpdatingObjectManager compares the actual and desired resources to create/update/delete as desired.
+type UpdatingObjectManager[Type client.Object] struct {
+	// Name used to identify this reconciler.  Defaults to `{Type}UpdatingObjectManager`.  Ideally
 	// unique, but not required to be so.
 	//
 	// +optional
@@ -92,28 +105,41 @@ type ResourceManager[Type client.Object] struct {
 	lazyInit      sync.Once
 }
 
-func (r *ResourceManager[T]) init() {
+func (r *UpdatingObjectManager[T]) init() {
 	r.lazyInit.Do(func() {
 		if internal.IsNil(r.Type) {
 			var nilT T
 			r.Type = newEmpty(nilT).(T)
 		}
 		if r.Name == "" {
-			r.Name = fmt.Sprintf("%sResourceManager", typeName(r.Type))
+			r.Name = fmt.Sprintf("%sUpdatingObjectManager", typeName(r.Type))
 		}
 		r.mutationCache = cache.NewExpiring()
 	})
 }
 
-func (r *ResourceManager[T]) Setup(ctx context.Context) error {
+// Deprecated call SetupWithManager instead
+func (r *UpdatingObjectManager[T]) Setup(ctx context.Context) error {
 	r.init()
 	return r.validate(ctx)
 }
 
-func (r *ResourceManager[T]) validate(ctx context.Context) error {
+func (r *UpdatingObjectManager[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+	if err := r.Setup(ctx); err != nil {
+		return err
+	}
+
+	if r.TrackDesired {
+		bldr.Watches(r.Type, EnqueueTracked(ctx))
+	}
+
+	return nil
+}
+
+func (r *UpdatingObjectManager[T]) validate(ctx context.Context) error {
 	// require MergeBeforeUpdate
 	if r.MergeBeforeUpdate == nil {
-		return fmt.Errorf("ResourceManager %q must define MergeBeforeUpdate", r.Name)
+		return fmt.Errorf("UpdatingObjectManager %q must define MergeBeforeUpdate", r.Name)
 	}
 
 	return nil
@@ -122,7 +148,7 @@ func (r *ResourceManager[T]) validate(ctx context.Context) error {
 // Manage a specific resource to create/update/delete based on the actual and desired state. The
 // resource is the reconciled resource and used to record events for mutations. The actual and
 // desired objects represent the managed resource and must be compatible with the type field.
-func (r *ResourceManager[T]) Manage(ctx context.Context, resource client.Object, actual, desired T) (T, error) {
+func (r *UpdatingObjectManager[T]) Manage(ctx context.Context, resource client.Object, actual, desired T) (T, error) {
 	r.init()
 
 	var nilT T
@@ -243,7 +269,7 @@ func (r *ResourceManager[T]) Manage(ctx context.Context, resource client.Object,
 	return current, nil
 }
 
-func (r *ResourceManager[T]) sanitize(resource T) interface{} {
+func (r *UpdatingObjectManager[T]) sanitize(resource T) interface{} {
 	if r.Sanitize == nil {
 		return resource
 	}

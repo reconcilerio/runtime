@@ -102,6 +102,9 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// status on the reconciled resource, return OnlyReconcileChildStatus as an error.
 	DesiredChildren func(ctx context.Context, resource Type) ([]ChildType, error)
 
+	// ChildObjectManager synchronizes the desired child state to the API Server.
+	ChildObjectManager ObjectManager[ChildType]
+
 	// ReflectChildrenStatusOnParent updates the reconciled resource's status with values from the
 	// child reconciliations. Select types of errors are captured, including:
 	//   - apierrs.IsAlreadyExists
@@ -114,6 +117,8 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// reconciled, (sorted by identifier).
 	ReflectChildrenStatusOnParent func(ctx context.Context, parent Type, result ChildSetResult[ChildType])
 
+	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
+	//
 	// HarmonizeImmutableFields allows fields that are immutable on the current
 	// object to be copied to the desired object in order to avoid creating
 	// updates which are guaranteed to fail.
@@ -121,6 +126,8 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// +optional
 	HarmonizeImmutableFields func(current, desired ChildType)
 
+	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
+	//
 	// MergeBeforeUpdate copies desired fields on to the current object before
 	// calling update. Typically fields to copy are the Spec, Labels and
 	// Annotations.
@@ -161,6 +168,8 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// Non-deterministic IDs will result in the rapid deletion and creation of child resources.
 	IdentifyChild func(child ChildType) string
 
+	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
+	//
 	// Sanitize is called with an object before logging the value. Any value may
 	// be returned. A meaningful subset of the resource is typically returned,
 	// like the Spec.
@@ -168,7 +177,6 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// +optional
 	Sanitize func(child ChildType) interface{}
 
-	stamp          *ResourceManager[ChildType]
 	lazyInit       sync.Once
 	voidReconciler *ChildReconciler[Type, ChildType, ChildListType]
 }
@@ -186,13 +194,16 @@ func (r *ChildSetReconciler[T, CT, CLT]) init() {
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sChildSetReconciler", typeName(r.ChildType))
 		}
-		r.stamp = &ResourceManager[CT]{
-			Name:                     r.Name,
-			Type:                     r.ChildType,
-			TrackDesired:             r.SkipOwnerReference,
-			HarmonizeImmutableFields: r.HarmonizeImmutableFields,
-			MergeBeforeUpdate:        r.MergeBeforeUpdate,
-			Sanitize:                 r.Sanitize,
+		if r.ChildObjectManager == nil {
+			// Deprecated compatibility fallback
+			r.ChildObjectManager = &UpdatingObjectManager[CT]{
+				Name:                     r.Name,
+				Type:                     r.ChildType,
+				TrackDesired:             r.SkipOwnerReference,
+				HarmonizeImmutableFields: r.HarmonizeImmutableFields,
+				MergeBeforeUpdate:        r.MergeBeforeUpdate,
+				Sanitize:                 r.Sanitize,
+			}
 		}
 		r.voidReconciler = r.childReconcilerFor(nilCT, nil, "", true)
 	})
@@ -212,14 +223,21 @@ func (r *ChildSetReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, m
 		return err
 	}
 
+	if err := r.ChildObjectManager.SetupWithManager(ctx, mgr, bldr); err != nil {
+		return err
+	}
+
 	if err := r.voidReconciler.SetupWithManager(ctx, mgr, bldr); err != nil {
 		return err
 	}
 
-	if r.Setup == nil {
-		return nil
+	if r.Setup != nil {
+		if err := r.Setup(ctx, mgr, bldr); err != nil {
+			return err
+		}
 	}
-	return r.Setup(ctx, mgr, bldr)
+
+	return nil
 }
 
 func (r *ChildSetReconciler[T, CT, CLT]) childReconcilerFor(desired CT, desiredErr error, id string, void bool) *ChildReconciler[T, CT, CLT] {
@@ -231,6 +249,7 @@ func (r *ChildSetReconciler[T, CT, CLT]) childReconcilerFor(desired CT, desiredE
 		DesiredChild: func(ctx context.Context, resource T) (CT, error) {
 			return desired, desiredErr
 		},
+		ChildObjectManager: r.ChildObjectManager,
 		ReflectChildStatusOnParent: func(ctx context.Context, parent T, child CT, err error) {
 			result := childSetResultStasher[CT]().RetrieveOrEmpty(ctx)
 			result.Children = append(result.Children, ChildSetPartialResult[CT]{
@@ -240,16 +259,13 @@ func (r *ChildSetReconciler[T, CT, CLT]) childReconcilerFor(desired CT, desiredE
 			})
 			childSetResultStasher[CT]().Store(ctx, result)
 		},
-		HarmonizeImmutableFields: r.HarmonizeImmutableFields,
-		MergeBeforeUpdate:        r.MergeBeforeUpdate,
-		ListOptions:              r.ListOptions,
+		ListOptions: r.ListOptions,
 		OurChild: func(resource T, child CT) bool {
 			if r.OurChild != nil && !r.OurChild(resource, child) {
 				return false
 			}
 			return void || id == r.IdentifyChild(child)
 		},
-		Sanitize: r.Sanitize,
 	}
 }
 
@@ -356,7 +372,6 @@ func (r *ChildSetReconciler[T, CT, CLT]) composeChildReconcilers(ctx context.Con
 	for _, id := range childIDs.List() {
 		child := desiredChildByID[id]
 		cr := r.childReconcilerFor(child, desiredChildrenErr, id, false)
-		cr.SetResourceManager(r.stamp)
 		sequence = append(sequence, cr)
 	}
 

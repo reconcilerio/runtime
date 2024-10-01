@@ -1134,7 +1134,8 @@ The `Manage(ctx context.Context, resource, actual, desired client.Object) (clien
 
 Use a provided ObjectManager or define a custom strategy to change specific behavior or employ entirely new approaches to sync state to the API Server.
 
-<a name="resourcemanager">
+<a name="resourcemanager" />
+
 #### UpdatingObjectManager
 
 The [`UpdatingObjectManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#UpdatingObjectManager) (previously [`ResourceManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceManager)) uses the `client.Client#{Create, Update, Delete}` methods to synchronize state to the API Server.

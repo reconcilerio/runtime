@@ -76,6 +76,8 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// +optional
 	ChildListType ChildListType
 
+	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
+	//
 	// Finalizer is set on the reconciled resource before a child resource is created, and cleared
 	// after a child resource is deleted. The value must be unique to this specific reconciler
 	// instance and not shared. Reusing a value may result in orphaned resources when the
@@ -119,6 +121,11 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// may grow, implementations should be defensive rather than assuming the error type.
 	ReflectChildStatusOnParent func(ctx context.Context, parent Type, child ChildType, err error)
 
+	// ChildObjectManager synchronizes the desired child state to the API Server.
+	ChildObjectManager ObjectManager[ChildType]
+
+	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
+	//
 	// HarmonizeImmutableFields allows fields that are immutable on the current
 	// object to be copied to the desired object in order to avoid creating
 	// updates which are guaranteed to fail.
@@ -126,6 +133,8 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// +optional
 	HarmonizeImmutableFields func(current, desired ChildType)
 
+	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
+	//
 	// MergeBeforeUpdate copies desired fields on to the current object before
 	// calling update. Typically fields to copy are the Spec, Labels and
 	// Annotations.
@@ -158,6 +167,8 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// +optional
 	OurChild func(resource Type, child ChildType) bool
 
+	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
+	//
 	// Sanitize is called with an object before logging the value. Any value may
 	// be returned. A meaningful subset of the resource is typically returned,
 	// like the Spec.
@@ -165,7 +176,6 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// +optional
 	Sanitize func(child ChildType) interface{}
 
-	stamp    *ResourceManager[ChildType]
 	lazyInit sync.Once
 }
 
@@ -182,11 +192,9 @@ func (r *ChildReconciler[T, CT, CLT]) init() {
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sChildReconciler", typeName(r.ChildType))
 		}
-		if r.Sanitize == nil {
-			r.Sanitize = func(child CT) interface{} { return child }
-		}
-		if r.stamp == nil {
-			r.stamp = &ResourceManager[CT]{
+		if r.ChildObjectManager == nil {
+			// Deprecated compatibility fallback
+			r.ChildObjectManager = &UpdatingObjectManager[CT]{
 				Name:                     r.Name,
 				Type:                     r.ChildType,
 				Finalizer:                r.Finalizer,
@@ -213,16 +221,21 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 		return err
 	}
 
-	if r.SkipOwnerReference {
-		bldr.Watches(r.ChildType, EnqueueTracked(ctx))
-	} else {
+	if !r.SkipOwnerReference {
 		bldr.Owns(r.ChildType)
 	}
 
-	if r.Setup == nil {
-		return nil
+	if err := r.ChildObjectManager.SetupWithManager(ctx, mgr, bldr); err != nil {
+		return err
 	}
-	return r.Setup(ctx, mgr, bldr)
+
+	if r.Setup != nil {
+		if err := r.Setup(ctx, mgr, bldr); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *ChildReconciler[T, CT, CLT]) validate(ctx context.Context) error {
@@ -251,19 +264,23 @@ func (r *ChildReconciler[T, CT, CLT]) validate(ctx context.Context) error {
 		return fmt.Errorf("ChildReconciler %q must implement ListOptions since owner references are not used", r.Name)
 	}
 
-	// require MergeBeforeUpdate
-	if r.MergeBeforeUpdate == nil {
-		return fmt.Errorf("ChildReconciler %q must implement MergeBeforeUpdate", r.Name)
+	// Deprecated fallback validation
+	if m, ok := r.ChildObjectManager.(*UpdatingObjectManager[CT]); ok {
+		// require MergeBeforeUpdate
+		if m.MergeBeforeUpdate == nil {
+			return fmt.Errorf("ChildReconciler %q must implement MergeBeforeUpdate", r.Name)
+		}
 	}
 
 	return nil
 }
 
-func (r *ChildReconciler[T, CT, CLT]) SetResourceManager(rm *ResourceManager[CT]) {
-	if r.stamp != nil {
+// Deprecated use ChildObjectManager instead
+func (r *ChildReconciler[T, CT, CLT]) SetResourceManager(rm ObjectManager[CT]) {
+	if r.ChildObjectManager != nil {
 		panic(fmt.Errorf("cannot call SetResourceManager after a resource manager is defined"))
 	}
-	r.stamp = rm
+	r.ChildObjectManager = rm
 }
 
 func (r *ChildReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource T) (Result, error) {
@@ -364,7 +381,7 @@ func (r *ChildReconciler[T, CT, CLT]) reconcile(ctx context.Context, resource T)
 	}
 
 	// create/update/delete desired child
-	return r.stamp.Manage(ctx, resource, actual, desired)
+	return r.ChildObjectManager.Manage(ctx, resource, actual, desired)
 }
 
 func (r *ChildReconciler[T, CT, CLT]) desiredChild(ctx context.Context, resource T) (CT, error) {

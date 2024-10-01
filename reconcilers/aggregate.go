@@ -85,6 +85,11 @@ type AggregateReconciler[Type client.Object] struct {
 	// +optional
 	DesiredResource func(ctx context.Context, resource Type) (Type, error)
 
+	// AggregateObjectManager synchronizes the aggregated resource with the API Server.
+	AggregateObjectManager ObjectManager[Type]
+
+	// Deprecated use AggregateObjectManager instead. Ignored when AggregateObjectManager is defined.
+	//
 	// HarmonizeImmutableFields allows fields that are immutable on the current
 	// object to be copied to the desired object in order to avoid creating
 	// updates which are guaranteed to fail.
@@ -92,11 +97,15 @@ type AggregateReconciler[Type client.Object] struct {
 	// +optional
 	HarmonizeImmutableFields func(current, desired Type)
 
+	// Deprecated use AggregateObjectManager instead. Ignored when AggregateObjectManager is defined.
+	//
 	// MergeBeforeUpdate copies desired fields on to the current object before
 	// calling update. Typically fields to copy are the Spec, Labels and
 	// Annotations.
 	MergeBeforeUpdate func(current, desired Type)
 
+	// Deprecated use AggregateObjectManager instead. Ignored when AggregateObjectManager is defined.
+	//
 	// Sanitize is called with an object before logging the value. Any value may
 	// be returned. A meaningful subset of the resource is typically returned,
 	// like the Spec.
@@ -122,8 +131,6 @@ type AggregateReconciler[Type client.Object] struct {
 
 	Config Config
 
-	// stamp manages the lifecycle of the aggregated resource.
-	stamp    *ResourceManager[Type]
 	lazyInit sync.Once
 }
 
@@ -155,13 +162,16 @@ func (r *AggregateReconciler[T]) init() {
 			}
 		}
 
-		r.stamp = &ResourceManager[T]{
-			Name: r.Name,
-			Type: r.Type,
+		if r.AggregateObjectManager == nil {
+			// Deprecated compatibility fallback
+			r.AggregateObjectManager = &UpdatingObjectManager[T]{
+				Name: r.Name,
+				Type: r.Type,
 
-			HarmonizeImmutableFields: r.HarmonizeImmutableFields,
-			MergeBeforeUpdate:        r.MergeBeforeUpdate,
-			Sanitize:                 r.Sanitize,
+				HarmonizeImmutableFields: r.HarmonizeImmutableFields,
+				MergeBeforeUpdate:        r.MergeBeforeUpdate,
+				Sanitize:                 r.Sanitize,
+			}
 		}
 	})
 }
@@ -213,7 +223,7 @@ func (r *AggregateReconciler[T]) SetupWithManagerYieldingController(ctx context.
 	if err := r.Reconciler.SetupWithManager(ctx, mgr, bldr); err != nil {
 		return nil, err
 	}
-	if err := r.stamp.Setup(ctx); err != nil {
+	if err := r.AggregateObjectManager.SetupWithManager(ctx, mgr, bldr); err != nil {
 		return nil, err
 	}
 	return bldr.Build(r)
@@ -309,7 +319,7 @@ func (r *AggregateReconciler[T]) reconcile(ctx context.Context, req Request) (Re
 	if err != nil {
 		return result, err
 	}
-	_, err = r.stamp.Manage(ctx, resource, resource, desired)
+	_, err = r.AggregateObjectManager.Manage(ctx, resource, resource, desired)
 	return result, err
 }
 

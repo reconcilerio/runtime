@@ -338,7 +338,7 @@ func (p *Patch) Apply(rebase client.Object) error {
 // The type is duplicated because generics are not supported in type aliases.
 // See https://github.com/golang/go/issues/46477#issuecomment-852701491
 type ResourceManager[Type client.Object] struct {
-	// Name used to identify this reconciler.  Defaults to `{Type}UpdatingObjectManager`.  Ideally
+	// Name used to identify this reconciler.  Defaults to `{Type}ResourceManager`.  Ideally
 	// unique, but not required to be so.
 	//
 	// +optional
@@ -391,6 +391,13 @@ type ResourceManager[Type client.Object] struct {
 
 func (r *ResourceManager[T]) init() {
 	r.lazyInit.Do(func() {
+		if internal.IsNil(r.Type) {
+			var nilT T
+			r.Type = newEmpty(nilT).(T)
+		}
+		if r.Name == "" {
+			r.Name = fmt.Sprintf("%sResourceManager", typeName(r.Type))
+		}
 		r.internal = &UpdatingObjectManager[T]{
 			Name:                     r.Name,
 			Type:                     r.Type,

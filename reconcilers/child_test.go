@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
@@ -96,9 +95,7 @@ func TestChildReconciler(t *testing.T) {
 					Data: reconcilers.MergeMaps(parent.Spec.Fields),
 				}, nil
 			},
-			MergeBeforeUpdate: func(current, desired *corev1.ConfigMap) {
-				current.Data = desired.Data
-			},
+			ChildObjectManager: &rtesting.StubObjectManager[*corev1.ConfigMap]{},
 			ReflectChildStatusOnParent: func(ctx context.Context, parent *resources.TestResource, child *corev1.ConfigMap, err error) {
 				if err != nil {
 					switch {
@@ -149,36 +146,6 @@ func TestChildReconciler(t *testing.T) {
 				},
 			},
 		},
-		"child is in sync, and tracked": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						// clear default owner ref since this is tracked
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.SkipOwnerReference = true
-					r.OurChild = func(resource *resources.TestResource, child *corev1.ConfigMap) bool {
-						return true
-					}
-					return r
-				},
-			},
-			ExpectTracks: []rtesting.TrackRequest{
-				rtesting.NewTrackRequest(configMapGiven, resourceReady, scheme),
-			},
-		},
 		"child is in sync, in a different namespace": {
 			Resource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {
@@ -216,10 +183,6 @@ func TestChildReconciler(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 					return defaultChildReconciler(c)
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
 			},
 			ExpectResource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {
@@ -263,10 +226,6 @@ func TestChildReconciler(t *testing.T) {
 					return r
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
 			ExpectResource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {
 					d.AddField("foo", "bar")
@@ -291,59 +250,6 @@ func TestChildReconciler(t *testing.T) {
 					}),
 			},
 		},
-		"create child with finalizer": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
-			},
-			ExpectTracks: []rtesting.TrackRequest{
-				rtesting.NewTrackRequest(configMapCreate, resource, scheme),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched",
-					`Patched finalizer %q`, testFinalizer),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer)
-					d.ResourceVersion("1000")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			ExpectCreates: []client.Object{
-				configMapCreate.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":["test.finalizer"],"resourceVersion":"999"}}`),
-				},
-			},
-		},
 		"update child": {
 			Resource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {
@@ -362,10 +268,6 @@ func TestChildReconciler(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
-			},
 			ExpectResource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {
 					d.AddField("foo", "bar")
@@ -379,128 +281,6 @@ func TestChildReconciler(t *testing.T) {
 			ExpectUpdates: []client.Object{
 				configMapGiven.
 					AddData("new", "field"),
-			},
-		},
-		"update child, preserve finalizers": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer, "some.other.finalizer")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
-			},
-			ExpectTracks: []rtesting.TrackRequest{
-				rtesting.NewTrackRequest(configMapGiven, resource, scheme),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer, "some.other.finalizer")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				DieReleasePtr(),
-			ExpectUpdates: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}).
-					AddData("new", "field"),
-			},
-		},
-		"update child, restoring missing finalizer": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
-			},
-			ExpectTracks: []rtesting.TrackRequest{
-				rtesting.NewTrackRequest(configMapGiven, resource, scheme),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched",
-					`Patched finalizer %q`, testFinalizer),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer)
-					d.ResourceVersion("1000")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				DieReleasePtr(),
-			ExpectUpdates: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}).
-					AddData("new", "field"),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":["test.finalizer"],"resourceVersion":"999"}}`),
-				},
 			},
 		},
 		"delete child": {
@@ -512,39 +292,6 @@ func TestChildReconciler(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 					return defaultChildReconciler(c)
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
-			},
-			ExpectDeletes: []rtesting.DeleteRef{
-				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
-			},
-		},
-		"delete child, preserve finalizers": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer, "some.other.finalizer")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
 			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
@@ -594,14 +341,6 @@ func TestChildReconciler(t *testing.T) {
 					d.AddField("foo", "bar")
 				}).
 				DieReleasePtr(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, "extra-child-1"),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, "extra-child-2"),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				{Group: "", Kind: "ConfigMap", Namespace: testNamespace, Name: "extra-child-1"},
 				{Group: "", Kind: "ConfigMap", Namespace: testNamespace, Name: "extra-child-2"},
@@ -626,81 +365,13 @@ func TestChildReconciler(t *testing.T) {
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
 					r.SkipOwnerReference = true
 					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
 					return r
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
 			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
-			},
-		},
-		"clear finalizer after child fully deleted": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.DeletionTimestamp(&now)
-					d.Finalizers(testFinalizer)
-				}).
-				DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched",
-					`Patched finalizer %q`, testFinalizer),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.DeletionTimestamp(&now)
-					d.Finalizers()
-					d.ResourceVersion("1000")
-				}).
-				DieReleasePtr(),
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
-				},
-			},
-		},
-		"preserve finalizer for terminating child": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.DeletionTimestamp(&now)
-					d.Finalizers(testFinalizer)
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-						d.DeletionTimestamp(&now)
-						d.Finalizers(testFinalizer)
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
 			},
 		},
 		"invalid child": {
@@ -732,10 +403,6 @@ func TestChildReconciler(t *testing.T) {
 					)
 				}).
 				DieReleasePtr(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					"Failed to create ConfigMap %q:  %q is invalid: metadata.name: Invalid value: %q", testName, testName, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate,
 			},
@@ -767,10 +434,6 @@ func TestChildReconciler(t *testing.T) {
 					)
 				}).
 				DieReleasePtr(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					"Failed to create ConfigMap %q:  %q already exists", testName, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate,
 			},
@@ -794,38 +457,10 @@ func TestChildReconciler(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					"Failed to create ConfigMap %q:  %q already exists", testName, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate,
 			},
 			ShouldErr: true,
-		},
-		"preserve immutable fields": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-					d.AddField("immutable", "field")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					AddData("immutable", "field"),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.HarmonizeImmutableFields = func(current, desired *corev1.ConfigMap) {
-						desired.Data["immutable"] = current.Data["immutable"]
-					}
-					return r
-				},
-			},
 		},
 		"status only reconcile": {
 			Resource: resource.DieReleasePtr(),
@@ -845,69 +480,6 @@ func TestChildReconciler(t *testing.T) {
 					}
 					return r
 				},
-			},
-		},
-		"sanitize child before logging": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Sanitize = func(child *corev1.ConfigMap) interface{} {
-						return child.Name
-					}
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			ExpectCreates: []client.Object{
-				configMapCreate,
-			},
-		},
-		"sanitize is mutation safe": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Sanitize = func(child *corev1.ConfigMap) interface{} {
-						child.Data["ignore"] = "me"
-						return child
-					}
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			ExpectCreates: []client.Object{
-				configMapCreate,
 			},
 		},
 		"error listing children": {
@@ -936,80 +508,8 @@ func TestChildReconciler(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					`Failed to create ConfigMap %q: inducing failure for create ConfigMap`, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate,
-			},
-			ShouldErr: true,
-		},
-		"error adding finalizer": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
-			},
-			WithReactors: []rtesting.ReactionFunc{
-				rtesting.InduceFailure("patch", "TestResource"),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "FinalizerPatchFailed",
-					`Failed to patch finalizer %q: inducing failure for patch TestResource`, testFinalizer),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":["test.finalizer"],"resourceVersion":"999"}}`),
-				},
-			},
-			ShouldErr: true,
-		},
-		"error clearing finalizer": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer)
-				}).
-				DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
-					return r
-				},
-			},
-			WithReactors: []rtesting.ReactionFunc{
-				rtesting.InduceFailure("patch", "TestResource"),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "FinalizerPatchFailed",
-					`Failed to patch finalizer %q: inducing failure for patch TestResource`, testFinalizer),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
-				},
 			},
 			ShouldErr: true,
 		},
@@ -1034,10 +534,6 @@ func TestChildReconciler(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "UpdateFailed",
-					`Failed to update ConfigMap %q: inducing failure for update ConfigMap`, testName),
-			},
 			ExpectUpdates: []client.Object{
 				configMapGiven.
 					AddData("new", "field"),
@@ -1056,10 +552,6 @@ func TestChildReconciler(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 					return defaultChildReconciler(c)
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "DeleteFailed",
-					`Failed to delete ConfigMap %q: inducing failure for delete ConfigMap`, testName),
 			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
@@ -1090,10 +582,6 @@ func TestChildReconciler(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "DeleteFailed",
-					`Failed to delete ConfigMap %q: inducing failure for delete ConfigMap`, "extra-child-1"),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				{Group: "", Kind: "ConfigMap", Namespace: testNamespace, Name: "extra-child-1"},
 			},
@@ -1122,9 +610,6 @@ func TestChildReconciler(t *testing.T) {
 func TestChildReconciler_Unstructured(t *testing.T) {
 	testNamespace := "test-namespace"
 	testName := "test-resource"
-	testFinalizer := "test.finalizer"
-
-	now := metav1.NewTime(time.Now().Truncate(time.Second))
 
 	scheme := runtime.NewScheme()
 	_ = resources.AddToScheme(scheme)
@@ -1199,9 +684,7 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 
 				return child, nil
 			},
-			MergeBeforeUpdate: func(current, desired *unstructured.Unstructured) {
-				current.Object["data"] = desired.Object["data"]
-			},
+			ChildObjectManager: &rtesting.StubObjectManager[*unstructured.Unstructured]{},
 			ReflectChildStatusOnParent: func(ctx context.Context, parent *unstructured.Unstructured, child *unstructured.Unstructured, err error) {
 				if err != nil {
 					if apierrs.IsAlreadyExists(err) {
@@ -1307,10 +790,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
 			ExpectResource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {
 					d.AddField("foo", "bar")
@@ -1321,60 +800,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 				DieReleaseUnstructured(),
 			ExpectCreates: []client.Object{
 				configMapCreate.DieReleaseUnstructured(),
-			},
-		},
-		"create child with finalizer": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			ExpectTracks: []rtesting.TrackRequest{
-				rtesting.NewTrackRequest(configMapCreate, resource, scheme),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched",
-					`Patched finalizer %q`, testFinalizer),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer)
-					d.ResourceVersion("1000")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			ExpectCreates: []client.Object{
-				configMapCreate.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}).
-					DieReleaseUnstructured(),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":["test.finalizer"],"resourceVersion":"999"}}`),
-				},
 			},
 		},
 		"update child": {
@@ -1395,10 +820,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
-			},
 			ExpectResource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {
 					d.AddField("foo", "bar")
@@ -1413,130 +834,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 				configMapGiven.
 					AddData("new", "field").
 					DieReleaseUnstructured(),
-			},
-		},
-		"update child, preserve finalizers": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer, "some.other.finalizer")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			ExpectTracks: []rtesting.TrackRequest{
-				rtesting.NewTrackRequest(configMapGiven, resource, scheme),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer, "some.other.finalizer")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				DieReleaseUnstructured(),
-			ExpectUpdates: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}).
-					AddData("new", "field").
-					DieReleaseUnstructured(),
-			},
-		},
-		"update child, restoring missing finalizer": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			ExpectTracks: []rtesting.TrackRequest{
-				rtesting.NewTrackRequest(configMapGiven, resource, scheme),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched",
-					`Patched finalizer %q`, testFinalizer),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer)
-					d.ResourceVersion("1000")
-				}).
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				DieReleaseUnstructured(),
-			ExpectUpdates: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}).
-					AddData("new", "field").
-					DieReleaseUnstructured(),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":["test.finalizer"],"resourceVersion":"999"}}`),
-				},
 			},
 		},
 		"delete child": {
@@ -1548,39 +845,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
 					return defaultChildReconciler(c)
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
-			},
-			ExpectDeletes: []rtesting.DeleteRef{
-				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
-			},
-		},
-		"delete child, preserve finalizers": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer, "some.other.finalizer")
-				}).
-				DieReleaseUnstructured(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
 			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
@@ -1630,113 +894,12 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					d.AddField("foo", "bar")
 				}).
 				DieReleaseUnstructured(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, "extra-child-1"),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, "extra-child-2"),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				{Group: "", Kind: "ConfigMap", Namespace: testNamespace, Name: "extra-child-1"},
 				{Group: "", Kind: "ConfigMap", Namespace: testNamespace, Name: "extra-child-2"},
 			},
 			ExpectCreates: []client.Object{
 				configMapCreate.DieReleaseUnstructured(),
-			},
-		},
-		"delete child during finalization": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.DeletionTimestamp(&now)
-					d.Finalizers(testFinalizer)
-				}).
-				DieReleaseUnstructured(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
-			},
-			ExpectDeletes: []rtesting.DeleteRef{
-				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
-			},
-		},
-		"clear finalizer after child fully deleted": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.DeletionTimestamp(&now)
-					d.Finalizers(testFinalizer)
-				}).
-				DieReleaseUnstructured(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched",
-					`Patched finalizer %q`, testFinalizer),
-			},
-			ExpectResource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.DeletionTimestamp(&now)
-					d.Finalizers()
-					d.ResourceVersion("1000")
-				}).
-				DieReleaseUnstructured(),
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":[],"resourceVersion":"999"}}`),
-				},
-			},
-		},
-		"preserve finalizer for terminating child": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.DeletionTimestamp(&now)
-					d.Finalizers(testFinalizer)
-				}).
-				DieReleaseUnstructured(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-						d.OwnerReferences()
-						d.DeletionTimestamp(&now)
-						d.Finalizers(testFinalizer)
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
 			},
 		},
 		"child name collision": {
@@ -1766,10 +929,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					)
 				}).
 				DieReleaseUnstructured(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					"Failed to create ConfigMap %q:  %q already exists", testName, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate.DieReleaseUnstructured(),
 			},
@@ -1793,39 +952,10 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					"Failed to create ConfigMap %q:  %q already exists", testName, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate.DieReleaseUnstructured(),
 			},
 			ShouldErr: true,
-		},
-		"preserve immutable fields": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-					d.AddField("immutable", "field")
-				}).
-				DieReleaseUnstructured(),
-			GivenObjects: []client.Object{
-				configMapGiven.
-					AddData("immutable", "field"),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.HarmonizeImmutableFields = func(current, desired *unstructured.Unstructured) {
-						immutable, _, _ := unstructured.NestedString(current.Object, "data", "immutable")
-						unstructured.SetNestedField(desired.Object, immutable, "data", "immutable")
-					}
-					return r
-				},
-			},
 		},
 		"status only reconcile": {
 			Resource: resource.DieReleaseUnstructured(),
@@ -1845,69 +975,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					}
 					return r
 				},
-			},
-		},
-		"sanitize child before logging": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Sanitize = func(child *unstructured.Unstructured) interface{} {
-						return child.GetName()
-					}
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			ExpectCreates: []client.Object{
-				configMapCreate.DieReleaseUnstructured(),
-			},
-		},
-		"sanitize is mutation safe": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Sanitize = func(child *unstructured.Unstructured) interface{} {
-						unstructured.SetNestedField(child.Object, "me", "data", "ignore")
-						return child
-					}
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			ExpectCreates: []client.Object{
-				configMapCreate.DieReleaseUnstructured(),
 			},
 		},
 		"error listing children": {
@@ -1936,80 +1003,8 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					`Failed to create ConfigMap %q: inducing failure for create ConfigMap`, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate.DieReleaseUnstructured(),
-			},
-			ShouldErr: true,
-		},
-		"error adding finalizer": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleaseUnstructured(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			WithReactors: []rtesting.ReactionFunc{
-				rtesting.InduceFailure("patch", "TestResource"),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "FinalizerPatchFailed",
-					`Failed to patch finalizer %q: inducing failure for patch TestResource`, testFinalizer),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":["test.finalizer"],"resourceVersion":"999"}}`),
-				},
-			},
-			ShouldErr: true,
-		},
-		"error clearing finalizer": {
-			Resource: resourceReady.
-				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-					d.Finalizers(testFinalizer)
-				}).
-				DieReleaseUnstructured(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
-					r := defaultChildReconciler(c)
-					r.Finalizer = testFinalizer
-					r.SkipOwnerReference = true
-					r.OurChild = func(parent *unstructured.Unstructured, child *unstructured.Unstructured) bool { return true }
-					return r
-				},
-			},
-			WithReactors: []rtesting.ReactionFunc{
-				rtesting.InduceFailure("patch", "TestResource"),
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "FinalizerPatchFailed",
-					`Failed to patch finalizer %q: inducing failure for patch TestResource`, testFinalizer),
-			},
-			ExpectPatches: []rtesting.PatchRef{
-				{
-					Group:     "testing.reconciler.runtime",
-					Kind:      "TestResource",
-					Namespace: testNamespace,
-					Name:      testName,
-					PatchType: types.MergePatchType,
-					Patch:     []byte(`{"metadata":{"finalizers":[],"resourceVersion":"999"}}`),
-				},
 			},
 			ShouldErr: true,
 		},
@@ -2034,10 +1029,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "UpdateFailed",
-					`Failed to update ConfigMap %q: inducing failure for update ConfigMap`, testName),
-			},
 			ExpectUpdates: []client.Object{
 				configMapGiven.
 					AddData("new", "field").
@@ -2057,10 +1048,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
 					return defaultChildReconciler(c)
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "DeleteFailed",
-					`Failed to delete ConfigMap %q: inducing failure for delete ConfigMap`, testName),
 			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
@@ -2091,10 +1078,6 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					return defaultChildReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "DeleteFailed",
-					`Failed to delete ConfigMap %q: inducing failure for delete ConfigMap`, "extra-child-1"),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				{Group: "", Kind: "ConfigMap", Namespace: testNamespace, Name: "extra-child-1"},
 			},
@@ -2117,228 +1100,5 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*unstructured.Unstructured], c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
 		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured])(t, c)
-	})
-}
-
-func TestChildReconciler_UnexportedFields(t *testing.T) {
-	testNamespace := "test-namespace"
-	testName := "test-resource"
-
-	now := metav1.NewTime(time.Now().Truncate(time.Second))
-
-	scheme := runtime.NewScheme()
-	_ = resources.AddToScheme(scheme)
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	resource := dies.TestResourceBlank.
-		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-			d.Namespace(testNamespace)
-			d.Name(testName)
-		}).
-		StatusDie(func(d *dies.TestResourceStatusDie) {
-			d.ConditionsDie(
-				diemetav1.ConditionBlank.Type(apis.ConditionReady).Status(metav1.ConditionUnknown).Reason("Initializing"),
-			)
-		})
-	resourceReady := resource.
-		StatusDie(func(d *dies.TestResourceStatusDie) {
-			d.ConditionsDie(
-				diemetav1.ConditionBlank.Type(apis.ConditionReady).Status(metav1.ConditionTrue).Reason("Ready"),
-			)
-		})
-
-	childCreate := dies.TestResourceUnexportedFieldsBlank.
-		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-			d.Namespace(testNamespace)
-			d.Name(testName)
-			d.ControlledBy(resource, scheme)
-		})
-	childGiven := childCreate.
-		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
-			d.CreationTimestamp(now)
-		})
-
-	defaultChildReconciler := func(c reconcilers.Config) *reconcilers.ChildReconciler[*resources.TestResource, *resources.TestResourceUnexportedFields, *resources.TestResourceUnexportedFieldsList] {
-		return &reconcilers.ChildReconciler[*resources.TestResource, *resources.TestResourceUnexportedFields, *resources.TestResourceUnexportedFieldsList]{
-			DesiredChild: func(ctx context.Context, parent *resources.TestResource) (*resources.TestResourceUnexportedFields, error) {
-				if len(parent.Spec.Fields) == 0 {
-					return nil, nil
-				}
-
-				return &resources.TestResourceUnexportedFields{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: parent.Namespace,
-						Name:      parent.Name,
-					},
-					Spec: resources.TestResourceUnexportedFieldsSpec{
-						Fields:         parent.Spec.Fields,
-						Template:       parent.Spec.Template,
-						ErrOnMarshal:   parent.Spec.ErrOnMarshal,
-						ErrOnUnmarshal: parent.Spec.ErrOnUnmarshal,
-					},
-				}, nil
-			},
-			MergeBeforeUpdate: func(current, desired *resources.TestResourceUnexportedFields) {
-				current.Spec.Fields = desired.Spec.Fields
-				current.Spec.Template = desired.Spec.Template
-				current.Spec.ErrOnMarshal = desired.Spec.ErrOnMarshal
-				current.Spec.ErrOnUnmarshal = desired.Spec.ErrOnUnmarshal
-			},
-			ReflectChildStatusOnParent: func(ctx context.Context, parent *resources.TestResource, child *resources.TestResourceUnexportedFields, err error) {
-				if err != nil {
-					switch {
-					case apierrs.IsAlreadyExists(err):
-						name := err.(apierrs.APIStatus).Status().Details.Name
-						parent.Status.MarkNotReady(ctx, "NameConflict", "%q already exists", name)
-					case apierrs.IsInvalid(err):
-						name := err.(apierrs.APIStatus).Status().Details.Name
-						parent.Status.MarkNotReady(ctx, "InvalidChild", "%q was rejected by the api server", name)
-					}
-					return
-				}
-				if child == nil {
-					parent.Status.Fields = nil
-					parent.Status.MarkReady(ctx)
-					return
-				}
-				parent.Status.Fields = child.Status.Fields
-				parent.Status.MarkReady(ctx)
-			},
-		}
-	}
-
-	rts := rtesting.SubReconcilerTests[*resources.TestResource]{
-		"child is in sync": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				childGiven.
-					SpecDie(func(d *dies.TestResourceUnexportedFieldsSpecDie) {
-						d.AddField("foo", "bar")
-					}).
-					StatusDie(func(d *dies.TestResourceUnexportedFieldsStatusDie) {
-						d.AddField("foo", "bar")
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return defaultChildReconciler(c)
-				},
-			},
-		},
-		"update status": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				childGiven.
-					SpecDie(func(d *dies.TestResourceUnexportedFieldsSpecDie) {
-						d.AddField("foo", "bar")
-					}).
-					StatusDie(func(d *dies.TestResourceUnexportedFieldsStatusDie) {
-						d.AddField("foo", "bar")
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return defaultChildReconciler(c)
-				},
-			},
-			ExpectResource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-		},
-		"create child": {
-			Resource: resource.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return defaultChildReconciler(c)
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created TestResourceUnexportedFields %q`, testName),
-			},
-			ExpectResource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-				}).
-				DieReleasePtr(),
-			ExpectCreates: []client.Object{
-				childCreate.
-					SpecDie(func(d *dies.TestResourceUnexportedFieldsSpecDie) {
-						d.AddField("foo", "bar")
-					}),
-			},
-		},
-		"update child": {
-			Resource: resourceReady.
-				SpecDie(func(d *dies.TestResourceSpecDie) {
-					d.AddField("foo", "bar")
-					d.AddField("new", "field")
-				}).
-				DieReleasePtr(),
-			GivenObjects: []client.Object{
-				childGiven.
-					SpecDie(func(d *dies.TestResourceUnexportedFieldsSpecDie) {
-						d.AddField("foo", "bar")
-					}),
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return defaultChildReconciler(c)
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated TestResourceUnexportedFields %q`, testName),
-			},
-			ExpectUpdates: []client.Object{
-				childGiven.
-					SpecDie(func(d *dies.TestResourceUnexportedFieldsSpecDie) {
-						d.AddField("foo", "bar")
-						d.AddField("new", "field")
-					}),
-			},
-		},
-		"delete child": {
-			Resource: resourceReady.DieReleasePtr(),
-			GivenObjects: []client.Object{
-				childGiven,
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return defaultChildReconciler(c)
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted TestResourceUnexportedFields %q`, testName),
-			},
-			ExpectDeletes: []rtesting.DeleteRef{
-				rtesting.NewDeleteRefFromObject(childGiven, scheme),
-			},
-		},
-	}
-
-	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*resources.TestResource], c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c)
 	})
 }

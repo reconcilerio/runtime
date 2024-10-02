@@ -1138,7 +1138,7 @@ Use a provided ObjectManager or define a custom strategy to change specific beha
 
 #### UpdatingObjectManager
 
-The [`UpdatingObjectManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#UpdatingObjectManager) (previously [`ResourceManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceManager)) uses the `client.Client#{Create, Update, Delete}` methods to synchronize state to the API Server.
+The [`UpdatingObjectManager`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#UpdatingObjectManager) (previously [`ResourceManager`](https://pkg.go.dev/reconciler.io/runtime@v0.21.0/reconcilers#ResourceManager)) uses the `client.Client#{Create, Update, Delete}` methods to synchronize state to the API Server.
 
 Internally, a mutations made to the resource at admission time (like defaults applied by a mutating webhook) are captured and reapplied to the desired state before checking if an update is needed. This reduces requests that are functionally a no-op but create churn on the API Server. The mutation cache is defensive and fails open to make an API request.
 
@@ -1164,10 +1164,6 @@ reconciler.io runtime is rapidly evolving. While we strive for API compatability
 
 Backwards support may be removed in a future release, users are encouraged to migrate.
 
-- `ResourceManager` is deprecated in favor of `ObjectManager` for a generic type, or `UpdatingObjectManager`.
-- `AggregateReconciler.{HarmonizeImmutableFields, MergeBeforeUpdate, Sanitize}` are deprecated in favor of `AggregateReconciler.AggregateObjectManager`.
-- `ChildReconciler.{Finalizer, HarmonizeImmutableFields, MergeBeforeUpdate, Sanitize, SetResourceManager}` are deprecated in favor of `ChildReconciler.ChildObjectManager`.
-- `ChildSetReconciler.{HarmonizeImmutableFields, MergeBeforeUpdate, Sanitize}` are deprecated in favor of `ChildSetReconciler.ChildObjectManager`.
 - status `InitializeConditions()` is deprecated in favor of `InitializeConditions(context.Context)`.
 - `ConditionSet#Manage` is deprecated in favor of `ConditionSet#ManageWithContext`.
 - `HaltSubReconcilers` is deprecated in favor of `ErrHaltSubReconcilers`.

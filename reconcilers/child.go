@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,8 +50,7 @@ var (
 //
 // The flow for each reconciliation request is:
 //   - DesiredChild
-//   - if child is desired, HarmonizeImmutableFields (optional)
-//   - if child is desired, MergeBeforeUpdate
+//   - ObjectManager#Manage
 //   - ReflectChildStatusOnParent
 //
 // During setup, the child resource type is registered to watch for changes.
@@ -75,22 +73,6 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	//
 	// +optional
 	ChildListType ChildListType
-
-	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
-	//
-	// Finalizer is set on the reconciled resource before a child resource is created, and cleared
-	// after a child resource is deleted. The value must be unique to this specific reconciler
-	// instance and not shared. Reusing a value may result in orphaned resources when the
-	// reconciled resource is deleted.
-	//
-	// Using a finalizer is encouraged when the Kubernetes garbage collector is unable to delete
-	// the child resource automatically, like when the reconciled resource and child are in different
-	// namespaces, scopes or clusters.
-	//
-	// Use of a finalizer implies that SkipOwnerReference is true, and OurChild must be defined.
-	//
-	// +optional
-	Finalizer string
 
 	// SkipOwnerReference when true will not create and find child resources via an owner
 	// reference. OurChild must be defined for the reconciler to distinguish the child being
@@ -124,22 +106,6 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// ChildObjectManager synchronizes the desired child state to the API Server.
 	ChildObjectManager ObjectManager[ChildType]
 
-	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
-	//
-	// HarmonizeImmutableFields allows fields that are immutable on the current
-	// object to be copied to the desired object in order to avoid creating
-	// updates which are guaranteed to fail.
-	//
-	// +optional
-	HarmonizeImmutableFields func(current, desired ChildType)
-
-	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
-	//
-	// MergeBeforeUpdate copies desired fields on to the current object before
-	// calling update. Typically fields to copy are the Spec, Labels and
-	// Annotations.
-	MergeBeforeUpdate func(current, desired ChildType)
-
 	// ListOptions allows custom options to be use when listing potential child resources. Each
 	// resource retrieved as part of the listing is confirmed via OurChild. There is a performance
 	// benefit to limiting the number of resource return for each List operation, however,
@@ -167,15 +133,6 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// +optional
 	OurChild func(resource Type, child ChildType) bool
 
-	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
-	//
-	// Sanitize is called with an object before logging the value. Any value may
-	// be returned. A meaningful subset of the resource is typically returned,
-	// like the Spec.
-	//
-	// +optional
-	Sanitize func(child ChildType) interface{}
-
 	lazyInit sync.Once
 }
 
@@ -191,18 +148,6 @@ func (r *ChildReconciler[T, CT, CLT]) init() {
 		}
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sChildReconciler", typeName(r.ChildType))
-		}
-		if r.ChildObjectManager == nil {
-			// Deprecated compatibility fallback
-			r.ChildObjectManager = &UpdatingObjectManager[CT]{
-				Name:                     r.Name,
-				Type:                     r.ChildType,
-				Finalizer:                r.Finalizer,
-				TrackDesired:             r.SkipOwnerReference,
-				HarmonizeImmutableFields: r.HarmonizeImmutableFields,
-				MergeBeforeUpdate:        r.MergeBeforeUpdate,
-				Sanitize:                 r.Sanitize,
-			}
 		}
 	})
 }
@@ -239,11 +184,6 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 }
 
 func (r *ChildReconciler[T, CT, CLT]) validate(ctx context.Context) error {
-	// default implicit values
-	if r.Finalizer != "" {
-		r.SkipOwnerReference = true
-	}
-
 	// require DesiredChild
 	if r.DesiredChild == nil {
 		return fmt.Errorf("ChildReconciler %q must implement DesiredChild", r.Name)
@@ -264,23 +204,12 @@ func (r *ChildReconciler[T, CT, CLT]) validate(ctx context.Context) error {
 		return fmt.Errorf("ChildReconciler %q must implement ListOptions since owner references are not used", r.Name)
 	}
 
-	// Deprecated fallback validation
-	if m, ok := r.ChildObjectManager.(*UpdatingObjectManager[CT]); ok {
-		// require MergeBeforeUpdate
-		if m.MergeBeforeUpdate == nil {
-			return fmt.Errorf("ChildReconciler %q must implement MergeBeforeUpdate", r.Name)
-		}
+	// require ChildObjectManager
+	if r.ChildObjectManager == nil {
+		return fmt.Errorf("ChildReconciler %q must implement ChildObjectManager", r.Name)
 	}
 
 	return nil
-}
-
-// Deprecated use ChildObjectManager instead
-func (r *ChildReconciler[T, CT, CLT]) SetResourceManager(rm ObjectManager[CT]) {
-	if r.ChildObjectManager != nil {
-		panic(fmt.Errorf("cannot call SetResourceManager after a resource manager is defined"))
-	}
-	r.ChildObjectManager = rm
 }
 
 func (r *ChildReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource T) (Result, error) {
@@ -330,7 +259,6 @@ func (r *ChildReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource T)
 func (r *ChildReconciler[T, CT, CLT]) reconcile(ctx context.Context, resource T) (CT, error) {
 	var nilCT CT
 	log := logr.FromContextOrDiscard(ctx)
-	pc := RetrieveOriginalConfigOrDie(ctx)
 	c := RetrieveConfigOrDie(ctx)
 
 	actual := r.ChildType.DeepCopyObject().(CT)
@@ -349,16 +277,10 @@ func (r *ChildReconciler[T, CT, CLT]) reconcile(ctx context.Context, resource T)
 	} else if len(children) > 1 {
 		// this shouldn't happen, delete everything to a clean slate
 		for _, extra := range children {
-			log.Info("deleting extra child", "child", namespaceName(extra))
-			if err := c.Delete(ctx, extra); err != nil {
-				if !errors.Is(err, ErrQuiet) {
-					pc.Recorder.Eventf(resource, corev1.EventTypeWarning, "DeleteFailed",
-						"Failed to delete %s %q: %v", typeName(r.ChildType), extra.GetName(), err)
-				}
+			log.Info("extra child detected", "child", namespaceName(extra))
+			if _, err := r.ChildObjectManager.Manage(ctx, resource, extra, nilCT); err != nil {
 				return nilCT, err
 			}
-			pc.Recorder.Eventf(resource, corev1.EventTypeNormal, "Deleted",
-				"Deleted %s %q", typeName(r.ChildType), extra.GetName())
 		}
 	}
 

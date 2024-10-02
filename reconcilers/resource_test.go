@@ -1078,7 +1078,7 @@ func TestResourceReconciler(t *testing.T) {
 								resource.Status.Fields = map[string]string{
 									"want": "this to run",
 								}
-								return reconcilers.HaltSubReconcilers
+								return reconcilers.ErrHaltSubReconcilers
 							},
 						},
 						&reconcilers.SyncReconciler[*resources.TestResource]{

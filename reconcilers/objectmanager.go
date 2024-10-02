@@ -44,7 +44,6 @@ type ObjectManager[Type client.Object] interface {
 }
 
 var _ ObjectManager[client.Object] = (*UpdatingObjectManager[client.Object])(nil)
-var _ ObjectManager[client.Object] = (*ResourceManager[client.Object])(nil)
 
 // UpdatingObjectManager compares the actual and desired resources to create/update/delete as desired.
 type UpdatingObjectManager[Type client.Object] struct {
@@ -330,97 +329,4 @@ func (p *Patch) Apply(rebase client.Object) error {
 	// reset rebase to its empty value before unmarshaling into it
 	replaceWithEmpty(rebase)
 	return json.Unmarshal(patchedBytes, rebase)
-}
-
-// Deprecated ResourceManager use either ObjectManger for the generic type, or
-// UpdatingObjectManager for a specific instance.
-//
-// The type is duplicated because generics are not supported in type aliases.
-// See https://github.com/golang/go/issues/46477#issuecomment-852701491
-type ResourceManager[Type client.Object] struct {
-	// Name used to identify this reconciler.  Defaults to `{Type}ResourceManager`.  Ideally
-	// unique, but not required to be so.
-	//
-	// +optional
-	Name string
-
-	// Type is the resource being created/updated/deleted by the reconciler. Required when the
-	// generic type is not a struct, or is unstructured.
-	//
-	// +optional
-	Type Type
-
-	// Finalizer is set on the reconciled resource before a managed resource is created, and cleared
-	// after a managed resource is deleted. The value must be unique to this specific manager
-	// instance and not shared. Reusing a value may result in orphaned resources when the
-	// reconciled resource is deleted.
-	//
-	// Using a finalizer is encouraged when the Kubernetes garbage collector is unable to delete
-	// the child resource automatically, like when the reconciled resource and child are in different
-	// namespaces, scopes or clusters.
-	//
-	// +optional
-	Finalizer string
-
-	// TrackDesired when true, the desired resource is tracked after creates, before
-	// updates, and on delete errors.
-	TrackDesired bool
-
-	// HarmonizeImmutableFields allows fields that are immutable on the current
-	// object to be copied to the desired object in order to avoid creating
-	// updates which are guaranteed to fail.
-	//
-	// +optional
-	HarmonizeImmutableFields func(current, desired Type)
-
-	// MergeBeforeUpdate copies desired fields on to the current object before
-	// calling update. Typically fields to copy are the Spec, Labels and
-	// Annotations.
-	MergeBeforeUpdate func(current, desired Type)
-
-	// Sanitize is called with an object before logging the value. Any value may
-	// be returned. A meaningful subset of the resource is typically returned,
-	// like the Spec.
-	//
-	// +optional
-	Sanitize func(child Type) interface{}
-
-	internal *UpdatingObjectManager[Type]
-	lazyInit sync.Once
-}
-
-func (r *ResourceManager[T]) init() {
-	r.lazyInit.Do(func() {
-		if internal.IsNil(r.Type) {
-			var nilT T
-			r.Type = newEmpty(nilT).(T)
-		}
-		if r.Name == "" {
-			r.Name = fmt.Sprintf("%sResourceManager", typeName(r.Type))
-		}
-		r.internal = &UpdatingObjectManager[T]{
-			Name:                     r.Name,
-			Type:                     r.Type,
-			Finalizer:                r.Finalizer,
-			TrackDesired:             r.TrackDesired,
-			HarmonizeImmutableFields: r.HarmonizeImmutableFields,
-			MergeBeforeUpdate:        r.MergeBeforeUpdate,
-			Sanitize:                 r.Sanitize,
-		}
-	})
-}
-
-func (r *ResourceManager[T]) Setup(ctx context.Context) error {
-	r.init()
-	return r.internal.Setup(ctx)
-}
-
-func (r *ResourceManager[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
-	r.init()
-	return r.internal.SetupWithManager(ctx, mgr, bldr)
-}
-
-func (r *ResourceManager[T]) Manage(ctx context.Context, resource client.Object, actual, desired T) (T, error) {
-	r.init()
-	return r.internal.Manage(ctx, resource, actual, desired)
 }

@@ -88,31 +88,6 @@ type AggregateReconciler[Type client.Object] struct {
 	// AggregateObjectManager synchronizes the aggregated resource with the API Server.
 	AggregateObjectManager ObjectManager[Type]
 
-	// Deprecated use AggregateObjectManager instead. Ignored when AggregateObjectManager is defined.
-	//
-	// HarmonizeImmutableFields allows fields that are immutable on the current
-	// object to be copied to the desired object in order to avoid creating
-	// updates which are guaranteed to fail.
-	//
-	// +optional
-	HarmonizeImmutableFields func(current, desired Type)
-
-	// Deprecated use AggregateObjectManager instead. Ignored when AggregateObjectManager is defined.
-	//
-	// MergeBeforeUpdate copies desired fields on to the current object before
-	// calling update. Typically fields to copy are the Spec, Labels and
-	// Annotations.
-	MergeBeforeUpdate func(current, desired Type)
-
-	// Deprecated use AggregateObjectManager instead. Ignored when AggregateObjectManager is defined.
-	//
-	// Sanitize is called with an object before logging the value. Any value may
-	// be returned. A meaningful subset of the resource is typically returned,
-	// like the Spec.
-	//
-	// +optional
-	Sanitize func(resource Type) interface{}
-
 	// BeforeReconcile is called first thing for each reconcile request.  A modified context may be
 	// returned.  Errors are returned immediately.
 	//
@@ -159,18 +134,6 @@ func (r *AggregateReconciler[T]) init() {
 		if r.AfterReconcile == nil {
 			r.AfterReconcile = func(ctx context.Context, req reconcile.Request, res reconcile.Result, err error) (reconcile.Result, error) {
 				return res, err
-			}
-		}
-
-		if r.AggregateObjectManager == nil {
-			// Deprecated compatibility fallback
-			r.AggregateObjectManager = &UpdatingObjectManager[T]{
-				Name: r.Name,
-				Type: r.Type,
-
-				HarmonizeImmutableFields: r.HarmonizeImmutableFields,
-				MergeBeforeUpdate:        r.MergeBeforeUpdate,
-				Sanitize:                 r.Sanitize,
 			}
 		}
 	})
@@ -238,6 +201,11 @@ func (r *AggregateReconciler[T]) validate(ctx context.Context) error {
 	// validate Reconciler value
 	if r.Reconciler == nil && r.DesiredResource == nil {
 		return fmt.Errorf("AggregateReconciler %q must define Reconciler and/or DesiredResource", r.Name)
+	}
+
+	// validate AggregateObjectManager value
+	if r.AggregateObjectManager == nil {
+		return fmt.Errorf("AggregateReconciler %q must define AggregateObjectManager", r.Name)
 	}
 
 	return nil

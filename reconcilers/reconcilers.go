@@ -54,9 +54,6 @@ var (
 	//
 	// See documentation for the specific SubReconciler caller to see how they handle this case.
 	ErrHaltSubReconcilers = fmt.Errorf("stop processing SubReconcilers, without returning an error: %w", ErrQuiet)
-
-	// Deprecated HaltSubReconcilers use ErrHaltSubReconcilers instead
-	HaltSubReconcilers = ErrHaltSubReconcilers
 )
 
 const requestStashKey StashKey = "reconciler.io/runtime:request"

@@ -71,9 +71,7 @@ func TestAggregateReconciler(t *testing.T) {
 				}
 				return resource, nil
 			},
-			MergeBeforeUpdate: func(current, desired *corev1.ConfigMap) {
-				current.Data = desired.Data
-			},
+			AggregateObjectManager: &rtesting.StubObjectManager[*corev1.ConfigMap]{},
 
 			Config: c,
 		}
@@ -124,10 +122,6 @@ func TestAggregateReconciler(t *testing.T) {
 					return defaultAggregateReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate.
 					AddData("foo", "bar"),
@@ -142,10 +136,6 @@ func TestAggregateReconciler(t *testing.T) {
 				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
 					return defaultAggregateReconciler(c)
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
 			},
 			ExpectUpdates: []client.Object{
 				configMapGiven.
@@ -166,70 +156,8 @@ func TestAggregateReconciler(t *testing.T) {
 					return r
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
-			},
-		},
-		"preserve immutable fields": {
-			Request: request,
-			GivenObjects: []client.Object{
-				configMapGiven.
-					AddData("foo", "bar").
-					AddData("immutable", "field"),
-			},
-			Metadata: map[string]interface{}{
-				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
-					r := defaultAggregateReconciler(c)
-					r.HarmonizeImmutableFields = func(current, desired *corev1.ConfigMap) {
-						desired.Data["immutable"] = current.Data["immutable"]
-					}
-					return r
-				},
-			},
-		},
-		"sanitize resource before logging": {
-			Request: request,
-			Metadata: map[string]interface{}{
-				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
-					r := defaultAggregateReconciler(c)
-					r.Sanitize = func(child *corev1.ConfigMap) interface{} {
-						return child.Name
-					}
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectCreates: []client.Object{
-				configMapCreate.
-					AddData("foo", "bar"),
-			},
-		},
-		"sanitize is mutation safe": {
-			Request: request,
-			Metadata: map[string]interface{}{
-				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
-					r := defaultAggregateReconciler(c)
-					r.Sanitize = func(child *corev1.ConfigMap) interface{} {
-						child.Data["ignore"] = "me"
-						return child
-					}
-					return r
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
-			ExpectCreates: []client.Object{
-				configMapCreate.
-					AddData("foo", "bar"),
 			},
 		},
 		"error getting resources": {
@@ -254,10 +182,6 @@ func TestAggregateReconciler(t *testing.T) {
 					return defaultAggregateReconciler(c)
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeWarning, "CreationFailed",
-					`Failed to create ConfigMap %q: inducing failure for create ConfigMap`, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate.
 					AddData("foo", "bar"),
@@ -276,10 +200,6 @@ func TestAggregateReconciler(t *testing.T) {
 				"Reconciler": func(t *testing.T, c reconcilers.Config) reconcile.Reconciler {
 					return defaultAggregateReconciler(c)
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeWarning, "UpdateFailed",
-					`Failed to update ConfigMap %q: inducing failure for update ConfigMap`, testName),
 			},
 			ExpectUpdates: []client.Object{
 				configMapGiven.
@@ -303,10 +223,6 @@ func TestAggregateReconciler(t *testing.T) {
 					}
 					return r
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeWarning, "DeleteFailed",
-					`Failed to delete ConfigMap %q: inducing failure for delete ConfigMap`, testName),
 			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven, scheme),
@@ -367,10 +283,6 @@ func TestAggregateReconciler(t *testing.T) {
 					return r
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate.
 					AddData("foo", "bar"),
@@ -395,10 +307,6 @@ func TestAggregateReconciler(t *testing.T) {
 					}
 					return r
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName),
 			},
 			ExpectCreates: []client.Object{
 				configMapCreate.
@@ -527,10 +435,6 @@ func TestAggregateReconciler(t *testing.T) {
 					return r
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
-			},
 			ExpectCreates: []client.Object{
 				configMapCreate,
 			},
@@ -555,10 +459,6 @@ func TestAggregateReconciler(t *testing.T) {
 			},
 			ExpectedResult: reconcile.Result{
 				Requeue: true,
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
 			},
 			ExpectUpdates: []client.Object{
 				configMapGiven.
@@ -585,10 +485,6 @@ func TestAggregateReconciler(t *testing.T) {
 					}
 					return r
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName),
 			},
 			ExpectUpdates: []client.Object{
 				configMapGiven.
@@ -628,10 +524,6 @@ func TestAggregateReconciler(t *testing.T) {
 					}
 					return r
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(configMapGiven, scheme, corev1.EventTypeWarning, "UpdateFailed",
-					`Failed to update ConfigMap %q: inducing failure for update ConfigMap`, testName),
 			},
 			ExpectUpdates: []client.Object{
 				configMapGiven.

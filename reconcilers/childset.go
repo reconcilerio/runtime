@@ -117,22 +117,6 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// reconciled, (sorted by identifier).
 	ReflectChildrenStatusOnParent func(ctx context.Context, parent Type, result ChildSetResult[ChildType])
 
-	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
-	//
-	// HarmonizeImmutableFields allows fields that are immutable on the current
-	// object to be copied to the desired object in order to avoid creating
-	// updates which are guaranteed to fail.
-	//
-	// +optional
-	HarmonizeImmutableFields func(current, desired ChildType)
-
-	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
-	//
-	// MergeBeforeUpdate copies desired fields on to the current object before
-	// calling update. Typically fields to copy are the Spec, Labels and
-	// Annotations.
-	MergeBeforeUpdate func(current, desired ChildType)
-
 	// ListOptions allows custom options to be use when listing potential child resources. Each
 	// resource retrieved as part of the listing is confirmed via OurChild. There is a performance
 	// benefit to limiting the number of resource return for each List operation, however,
@@ -168,15 +152,6 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// Non-deterministic IDs will result in the rapid deletion and creation of child resources.
 	IdentifyChild func(child ChildType) string
 
-	// Deprecated use ChildObjectManager instead. Ignored when ChildObjectManager is defined.
-	//
-	// Sanitize is called with an object before logging the value. Any value may
-	// be returned. A meaningful subset of the resource is typically returned,
-	// like the Spec.
-	//
-	// +optional
-	Sanitize func(child ChildType) interface{}
-
 	lazyInit       sync.Once
 	voidReconciler *ChildReconciler[Type, ChildType, ChildListType]
 }
@@ -193,17 +168,6 @@ func (r *ChildSetReconciler[T, CT, CLT]) init() {
 		}
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sChildSetReconciler", typeName(r.ChildType))
-		}
-		if r.ChildObjectManager == nil {
-			// Deprecated compatibility fallback
-			r.ChildObjectManager = &UpdatingObjectManager[CT]{
-				Name:                     r.Name,
-				Type:                     r.ChildType,
-				TrackDesired:             r.SkipOwnerReference,
-				HarmonizeImmutableFields: r.HarmonizeImmutableFields,
-				MergeBeforeUpdate:        r.MergeBeforeUpdate,
-				Sanitize:                 r.Sanitize,
-			}
 		}
 		r.voidReconciler = r.childReconcilerFor(nilCT, nil, "", true)
 	})
@@ -298,6 +262,11 @@ func (r *ChildSetReconciler[T, CT, CLT]) validate(ctx context.Context) error {
 	// require IdentifyChild
 	if r.IdentifyChild == nil {
 		return fmt.Errorf("ChildSetReconciler %q must implement IdentifyChild", r.Name)
+	}
+
+	// require ChildObjectManager
+	if r.ChildObjectManager == nil {
+		return fmt.Errorf("ChildSetReconciler %q must implement ChildObjectManager", r.Name)
 	}
 
 	return nil

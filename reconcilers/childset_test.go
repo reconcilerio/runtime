@@ -127,9 +127,7 @@ func TestChildSetReconciler(t *testing.T) {
 				}
 				return annotations[idKey]
 			},
-			MergeBeforeUpdate: func(current, desired *corev1.ConfigMap) {
-				current.Data = desired.Data
-			},
+			ChildObjectManager: &rtesting.StubObjectManager[*corev1.ConfigMap]{},
 			ReflectChildrenStatusOnParent: func(ctx context.Context, parent *resources.TestResource, result reconcilers.ChildSetResult[*corev1.ConfigMap]) {
 				if err := result.AggregateError(); err != nil {
 					if apierrs.IsAlreadyExists(err) {
@@ -247,9 +245,6 @@ func TestChildSetReconciler(t *testing.T) {
 					d.AddField("green.foo", "bar")
 				}).
 				DieReleasePtr(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted", "Deleted ConfigMap %q", configMapBlueGiven.GetName()),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapBlueGiven, scheme),
 			},
@@ -312,10 +307,6 @@ func TestChildSetReconciler(t *testing.T) {
 					d.AddField("green.foo", "bar")
 				}).
 				DieReleasePtr(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName+"-green"),
-			},
 			ExpectCreates: []client.Object{
 				configMapGreenCreate.DieReleasePtr(),
 			},
@@ -347,10 +338,6 @@ func TestChildSetReconciler(t *testing.T) {
 					d.AddField("blue.foo", "bar")
 				}).
 				DieReleasePtr(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName+"-green"),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGreenGiven.DieReleasePtr(), scheme),
 			},
@@ -388,12 +375,6 @@ func TestChildSetReconciler(t *testing.T) {
 					d.AddField("green.foo", "updated-green")
 				}).
 				DieReleasePtr(),
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName+"-blue"),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated",
-					`Updated ConfigMap %q`, testName+"-green"),
-			},
 			ExpectUpdates: []client.Object{
 				configMapBlueGiven.
 					AddData("foo", "updated-blue").
@@ -470,14 +451,6 @@ func TestChildSetReconciler(t *testing.T) {
 					return r
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName+"-blue"),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName+"-green"),
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created",
-					`Created ConfigMap %q`, testName+"-blue"),
-			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapBlueGiven.DieReleasePtr(), scheme),
 				rtesting.NewDeleteRefFromObject(configMapGreenGiven.DieReleasePtr(), scheme),
@@ -509,10 +482,6 @@ func TestChildSetReconciler(t *testing.T) {
 					}
 					return r
 				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted",
-					`Deleted ConfigMap %q`, testName),
 			},
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(configMapGiven.DieReleasePtr(), scheme),
@@ -613,10 +582,6 @@ func TestChildSetReconciler(t *testing.T) {
 				rtesting.InduceFailure("create", "ConfigMap"),
 			},
 			ShouldErr: true,
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed",
-					`Failed to create ConfigMap %q: inducing failure for create ConfigMap`, testName+"-blue"),
-			},
 			ExpectCreates: []client.Object{
 				configMapBlueCreate.DieReleasePtr(),
 			},

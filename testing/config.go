@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/client-go/kubernetes/scheme"
+	clientgotesting "k8s.io/client-go/testing"
+	"k8s.io/utils/ptr"
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/reconcilers"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -135,8 +137,10 @@ func (c *ExpectConfig) configNameMsg() string {
 }
 
 func (c *ExpectConfig) createClient(objs []client.Object, statusSubResourceTypes []client.Object) *clientWrapper {
-	builder := fake.NewClientBuilder()
+	tracker := clientgotesting.NewObjectTracker(c.Scheme, scheme.Codecs.UniversalDecoder())
 
+	builder := fake.NewClientBuilder()
+	builder.WithObjectTracker(tracker)
 	builder.WithScheme(c.Scheme)
 	builder.WithStatusSubresource(statusSubResourceTypes...)
 	builder.WithObjects(prepareObjects(objs)...)
@@ -144,7 +148,7 @@ func (c *ExpectConfig) createClient(objs []client.Object, statusSubResourceTypes
 		builder = c.WithClientBuilder(builder)
 	}
 
-	return NewFakeClientWrapper(duck.NewDuckAwareClientWrapper(builder.Build()))
+	return NewFakeClientWrapper(duck.NewDuckAwareClientWrapper(builder.Build()), tracker)
 }
 
 // Config returns the Config object. This method should only be called once. Subsequent calls are
@@ -441,13 +445,13 @@ var (
 		if s == nil || s.Empty() {
 			return nil
 		}
-		return pointer.String(s.String())
+		return ptr.To[string](s.String())
 	})
 	NormalizeFieldSelector = cmp.Transformer("fields.Selector", func(s fields.Selector) *string {
 		if s == nil || s.Empty() {
 			return nil
 		}
-		return pointer.String(s.String())
+		return ptr.To[string](s.String())
 	})
 )
 

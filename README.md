@@ -982,7 +982,7 @@ func StashExampleSubReconciler(c reconcilers.Config) reconcilers.SubReconciler[*
 		Name: "StashExample",
 		Sync: func(ctx context.Context, resource *examplev1.MyExample) error {
 			value, err := exampleStasher.RetrieveOrError(ctx)
-			if err == reconcilers.ErrStashValueNotFound {
+			if err != nil {
 				return nil, fmt.Errorf("%w for key %q", err, exampleStasher.Key())
 			}
 			... // do something with the value

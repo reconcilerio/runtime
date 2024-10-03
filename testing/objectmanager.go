@@ -30,6 +30,19 @@ import (
 
 var _ reconcilers.ObjectManager[client.Object] = (*StubObjectManager[client.Object])(nil)
 
+// StubObjectManager is used for testing the orchestration of an ObjectManager's essential behavior
+// without the full robustness of a real ObjectManager implementation.
+//
+// There are four possible outcomes:
+// - create a desired resource, returning the created object
+// - update an outdated resource, returning the updated object
+// - delete an undesired resource, returning nil
+// - do nothing when the resources are in sync, returning the actual object
+//
+// If any of the client calls error, the error is returned.
+//
+// There are no user configurable values. Merging of desired and actual objects is handled
+// reflectively and may be unsafe for some resources.
 type StubObjectManager[Type client.Object] struct{}
 
 func (m *StubObjectManager[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
@@ -99,4 +112,49 @@ func (m *StubObjectManager[T]) unsafeMergeInto(target, source T) {
 	// copy allowed metadata fields
 	target.SetAnnotations(source.GetAnnotations())
 	target.SetLabels(source.GetLabels())
+}
+
+var _ reconcilers.SubReconciler[client.Object] = (*ObjectManagerReconcilerTestHarness[client.Object])(nil)
+
+// ObjectManagerReconcilerTestHarness orchestrates an ObjectManager as a SubReconciler so that it
+// can be easily tested within a SubReconcilerTestCase.
+//
+// The actual and desired objects must be defined in the stash via the
+// ObjectManagerReconcilerTestHarnessActualStasher and
+// ObjectManagerReconcilerTestHarnessDesiredStasher stashers. Failure to stash these values will
+// panic the reconciler. The resulting object is stashed with
+// ObjectManagerReconcilerTestHarnessResultStasher.
+//
+// The actual object, when defined, is automatically added as a given object.
+type ObjectManagerReconcilerTestHarness[T client.Object] struct {
+	ObjectManager reconcilers.ObjectManager[T]
+}
+
+func (h *ObjectManagerReconcilerTestHarness[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
+	return h.ObjectManager.SetupWithManager(ctx, mgr, bldr)
+}
+
+func (h *ObjectManagerReconcilerTestHarness[T]) Reconcile(ctx context.Context, resource client.Object) (reconcilers.Result, error) {
+	actual := ObjectManagerReconcilerTestHarnessActualStasher[T]().RetrieveOrDie(ctx)
+	desired := ObjectManagerReconcilerTestHarnessDesiredStasher[T]().RetrieveOrDie(ctx)
+	if !internal.IsNil(actual) {
+		c := reconcilers.RetrieveConfigOrDie(ctx)
+		c.Client.(TestClient).AddGiven(actual)
+	}
+
+	result, err := h.ObjectManager.Manage(ctx, resource, actual, desired)
+	ObjectManagerReconcilerTestHarnessResultStasher[T]().Store(ctx, result)
+	return reconcilers.Result{}, err
+}
+
+func ObjectManagerReconcilerTestHarnessActualStasher[T client.Object]() reconcilers.Stasher[T] {
+	return reconcilers.NewStasher[T]("reconciler.io/object-manager-reconciler-test-harness-actual")
+}
+
+func ObjectManagerReconcilerTestHarnessDesiredStasher[T client.Object]() reconcilers.Stasher[T] {
+	return reconcilers.NewStasher[T]("reconciler.io/object-manager-reconciler-test-harness-desired")
+}
+
+func ObjectManagerReconcilerTestHarnessResultStasher[T client.Object]() reconcilers.Stasher[T] {
+	return reconcilers.NewStasher[T]("reconciler.io/object-manager-reconciler-test-harness-result")
 }

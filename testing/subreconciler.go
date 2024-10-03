@@ -175,6 +175,9 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	// Set func for verifying stashed values
 	if tc.VerifyStashedValue == nil {
 		tc.VerifyStashedValue = func(t *testing.T, key reconcilers.StashKey, expected, actual interface{}) {
+			if internal.IsNil(expected) && internal.IsNil(actual) {
+				return
+			}
 			if diff := cmp.Diff(expected, actual, reconcilers.IgnoreAllUnexported, IgnoreLastTransitionTime, IgnoreTypeMeta, IgnoreCreationTimestamp, IgnoreResourceVersion, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("ExpectStashedValues[%q] differs (%s, %s): %s", key, DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 			}

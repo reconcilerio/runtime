@@ -45,6 +45,12 @@ func StashValue(ctx context.Context, key StashKey, value interface{}) {
 	stash[key] = value
 }
 
+func HasValue(ctx context.Context, key StashKey) bool {
+	stash := retrieveStashMap(ctx)
+	_, ok := stash[key]
+	return ok
+}
+
 func RetrieveValue(ctx context.Context, key StashKey) interface{} {
 	stash := retrieveStashMap(ctx)
 	return stash[key]
@@ -68,6 +74,9 @@ type Stasher[T any] interface {
 
 	// Clear removes the key from the stash returning the previous value, if any.
 	Clear(ctx context.Context) T
+
+	// Has returns true when the stash contains the key. The type of the value is not checked.
+	Has(ctx context.Context) bool
 
 	// RetrieveOrDie retrieves the value from the stash, or panics if the key is not in the stash
 	RetrieveOrDie(ctx context.Context) T
@@ -103,6 +112,10 @@ func (s *stasher[T]) Clear(ctx context.Context) T {
 	return previous
 }
 
+func (s *stasher[T]) Has(ctx context.Context) bool {
+	return HasValue(ctx, s.Key())
+}
+
 func (s *stasher[T]) RetrieveOrDie(ctx context.Context) T {
 	value, err := s.RetrieveOrError(ctx)
 	if err != nil {
@@ -112,13 +125,23 @@ func (s *stasher[T]) RetrieveOrDie(ctx context.Context) T {
 }
 
 var ErrStashValueNotFound = errors.New("value not found in stash")
+var ErrStashValueNotAssignable = errors.New("value found in stash is not of an assignable type")
 
 func (s *stasher[T]) RetrieveOrError(ctx context.Context) (T, error) {
-	value, ok := RetrieveValue(ctx, s.Key()).(T)
-	if !ok {
-		return value, ErrStashValueNotFound
+	var emptyT T
+	value := RetrieveValue(ctx, s.Key())
+	if value == nil {
+		// distinguish nil and missing values in stash
+		if !s.Has(ctx) {
+			return emptyT, ErrStashValueNotFound
+		}
+		return emptyT, nil
 	}
-	return value, nil
+	typedValue, ok := value.(T)
+	if !ok {
+		return emptyT, ErrStashValueNotAssignable
+	}
+	return typedValue, nil
 }
 
 func (s *stasher[T]) RetrieveOrEmpty(ctx context.Context) T {

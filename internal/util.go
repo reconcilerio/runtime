@@ -20,6 +20,9 @@ import "reflect"
 
 // IsNil returns true if the value is nil, false if the value is not nilable or not nil
 func IsNil(val interface{}) bool {
+	if val == nil {
+		return true
+	}
 	if !IsNilable(val) {
 		return false
 	}

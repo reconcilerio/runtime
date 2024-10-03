@@ -30,8 +30,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type TestClient interface {
+	client.Client
+
+	AddGiven(objs ...client.Object)
+	AddReactor(verb, kind string, reaction ReactionFunc)
+	PrependReactor(verb, kind string, reaction ReactionFunc)
+}
+
 type clientWrapper struct {
 	client                  client.Client
+	tracker                 clientgotesting.ObjectTracker
 	CreateActions           []objectAction
 	UpdateActions           []objectAction
 	PatchActions            []PatchAction
@@ -43,11 +52,12 @@ type clientWrapper struct {
 	reactionChain           []Reactor
 }
 
-var _ client.Client = &clientWrapper{}
+var _ TestClient = (*clientWrapper)(nil)
 
-func NewFakeClientWrapper(client client.Client) *clientWrapper {
+func NewFakeClientWrapper(client client.Client, tracker clientgotesting.ObjectTracker) *clientWrapper {
 	c := &clientWrapper{
 		client:                  client,
+		tracker:                 tracker,
 		CreateActions:           []objectAction{},
 		UpdateActions:           []objectAction{},
 		PatchActions:            []PatchAction{},
@@ -87,6 +97,14 @@ func prepareObjects(objs []client.Object) []client.Object {
 		o[i] = obj
 	}
 	return o
+}
+
+func (w *clientWrapper) AddGiven(objs ...client.Object) {
+	for _, obj := range prepareObjects(objs) {
+		if err := w.tracker.Add(obj); err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (w *clientWrapper) AddReactor(verb, kind string, reaction ReactionFunc) {

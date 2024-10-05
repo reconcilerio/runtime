@@ -22,6 +22,8 @@ import (
 
 type Reactor = clientgotesting.Reactor
 type ReactionFunc = clientgotesting.ReactionFunc
+type WatchReactor = clientgotesting.WatchReactor
+type WatchReactionFunc = clientgotesting.WatchReactionFunc
 
 type Action = clientgotesting.Action
 type GetAction = clientgotesting.GetAction

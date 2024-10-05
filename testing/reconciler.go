@@ -48,9 +48,10 @@ type ReconcilerTestCase struct {
 
 	// Request identifies the object to be reconciled
 	Request reconcilers.Request
-	// WithReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
+	// WithReactors and WithWatchReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
 	// each call to the clientset providing the ability to mutate the resource or inject an error.
-	WithReactors []ReactionFunc
+	WithReactors      []ReactionFunc
+	WithWatchReactors []WatchReactionFunc
 	// WithClientBuilder allows a test to modify the fake client initialization.
 	WithClientBuilder func(*fake.ClientBuilder) *fake.ClientBuilder
 	// StatusSubResourceTypes is a set of object types that support the status sub-resource. For
@@ -188,6 +189,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 		APIGivenObjects:         tc.APIGivenObjects,
 		WithClientBuilder:       tc.WithClientBuilder,
 		WithReactors:            tc.WithReactors,
+		WithWatchReactors:       tc.WithWatchReactors,
 		GivenTracks:             tc.GivenTracks,
 		ExpectTracks:            tc.ExpectTracks,
 		ExpectEvents:            tc.ExpectEvents,

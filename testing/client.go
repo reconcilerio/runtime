@@ -50,6 +50,7 @@ type clientWrapper struct {
 	StatusPatchActions      []PatchAction
 	genCount                int
 	reactionChain           []Reactor
+	watchReactionChain      []WatchReactor
 }
 
 var _ TestClient = (*clientWrapper)(nil)
@@ -67,6 +68,7 @@ func NewFakeClientWrapper(client client.Client, tracker clientgotesting.ObjectTr
 		StatusPatchActions:      []PatchAction{},
 		genCount:                0,
 		reactionChain:           []Reactor{},
+		watchReactionChain:      []WatchReactor{},
 	}
 	// generate names on create
 	c.AddReactor("create", "*", func(action Action) (bool, runtime.Object, error) {
@@ -113,6 +115,10 @@ func (w *clientWrapper) AddReactor(verb, kind string, reaction ReactionFunc) {
 
 func (w *clientWrapper) PrependReactor(verb, kind string, reaction ReactionFunc) {
 	w.reactionChain = append([]Reactor{&clientgotesting.SimpleReactor{Verb: verb, Resource: kind, Reaction: reaction}}, w.reactionChain...)
+}
+
+func (w *clientWrapper) PrependWatchReactor(kind string, reaction WatchReactionFunc) {
+	w.watchReactionChain = append([]WatchReactor{&clientgotesting.SimpleWatchReactor{Resource: kind, Reaction: reaction}}, w.watchReactionChain...)
 }
 
 func (w *clientWrapper) objmeta(obj runtime.Object) (schema.GroupVersionResource, string, string, error) {

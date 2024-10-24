@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/utils/pointer"
+	"reconciler.io/runtime/trace"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -125,6 +126,9 @@ func (r *IfThen[T]) Reconcile(ctx context.Context, resource T) (Result, error) {
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	if r.If(ctx, resource) {
 		return r.Then.Reconcile(ctx, resource)
@@ -256,6 +260,9 @@ func (r *While[T]) Reconcile(ctx context.Context, resource T) (Result, error) {
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	aggregateResult := Result{}
 	for i := 0; true; i++ {
@@ -494,6 +501,9 @@ func (r *TryCatch[T]) Reconcile(ctx context.Context, resource T) (Result, error)
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
+
 	result, err := r.Try.Reconcile(ctx, resource)
 	if r.Catch != nil {
 		result, err = r.Catch(ctx, resource, result, err)
@@ -580,6 +590,9 @@ func (r *OverrideSetup[T]) Reconcile(ctx context.Context, resource T) (Result, e
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	if r.Reconciler == nil {
 		return Result{}, nil

@@ -33,6 +33,6 @@ jobs:
       run: |
         go test -v ./... -coverprofile cover.out
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         token: 97c581bf-f8ad-4881-8ace-ebb1e2d5b0e1

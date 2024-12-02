@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/errors"
+	"reconciler.io/runtime/trace"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -105,11 +106,6 @@ func (r *CastResource[T, CT]) validate(ctx context.Context) error {
 func (r *CastResource[T, CT]) Reconcile(ctx context.Context, resource T) (Result, error) {
 	r.init()
 
-	if r.noop {
-		// cast the type rather than convert the object
-		return r.Reconciler.Reconcile(ctx, client.Object(resource).(CT))
-	}
-
 	var nilCT CT
 	emptyCT := newEmpty(nilCT).(CT)
 
@@ -117,6 +113,14 @@ func (r *CastResource[T, CT]) Reconcile(ctx context.Context, resource T) (Result
 		WithName(r.Name).
 		WithValues("castResourceType", typeName(emptyCT))
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
+
+	if r.noop {
+		// cast the type rather than convert the object
+		return r.Reconciler.Reconcile(ctx, client.Object(resource).(CT))
+	}
 
 	ctx, castResource, err := r.cast(ctx, resource)
 	if err != nil {

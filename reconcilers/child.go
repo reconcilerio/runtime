@@ -168,6 +168,7 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 
 	if !r.SkipOwnerReference {
 		bldr.Owns(r.ChildType)
+		bldr.Watches(r.ChildType, EnqueueTracked(ctx))
 	}
 
 	if err := r.ChildObjectManager.SetupWithManager(ctx, mgr, bldr); err != nil {
@@ -240,6 +241,10 @@ func (r *ChildReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource T)
 				return Result{}, err
 			}
 			log.Info("unable to reconcile child, not owned", "child", namespaceName(conflicted), "ownerRefs", conflicted.GetOwnerReferences())
+			if !r.SkipOwnerReference {
+				// manually track to watch for deletion since the existing resource is not owned by us
+				c.Tracker.TrackObject(conflicted, resource)
+			}
 			r.ReflectChildStatusOnParent(ctx, resource, child, err)
 			return Result{}, nil
 		case apierrs.IsInvalid(err):

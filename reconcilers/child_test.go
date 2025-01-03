@@ -413,6 +413,12 @@ func TestChildReconciler(t *testing.T) {
 					d.AddField("foo", "bar")
 				}).
 				DieReleasePtr(),
+			APIGivenObjects: []client.Object{
+				configMapGiven.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.OwnerReferences()
+					}),
+			},
 			WithReactors: []rtesting.ReactionFunc{
 				rtesting.InduceFailure("create", "ConfigMap", rtesting.InduceFailureOpts{
 					Error: apierrs.NewAlreadyExists(schema.GroupResource{}, testName),
@@ -436,6 +442,9 @@ func TestChildReconciler(t *testing.T) {
 				DieReleasePtr(),
 			ExpectCreates: []client.Object{
 				configMapCreate,
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(configMapGiven, resource, scheme),
 			},
 		},
 		"child name collision, stale informer cache": {
@@ -908,6 +917,12 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 					d.AddField("foo", "bar")
 				}).
 				DieReleaseUnstructured(),
+			APIGivenObjects: []client.Object{
+				configMapGiven.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.OwnerReferences()
+					}).DieReleaseUnstructured(),
+			},
 			WithReactors: []rtesting.ReactionFunc{
 				rtesting.InduceFailure("create", "ConfigMap", rtesting.InduceFailureOpts{
 					Error: apierrs.NewAlreadyExists(schema.GroupResource{}, testName),
@@ -931,6 +946,9 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 				DieReleaseUnstructured(),
 			ExpectCreates: []client.Object{
 				configMapCreate.DieReleaseUnstructured(),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(configMapGiven, resource, scheme),
 			},
 		},
 		"child name collision, stale informer cache": {

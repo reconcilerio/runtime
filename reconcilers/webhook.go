@@ -212,7 +212,7 @@ func (r *AdmissionWebhookAdapter[T]) reconcile(ctx context.Context, req admissio
 		if err := defaulter.Default(ctx, resource); err != nil {
 			return err
 		}
-	} else if defaulter, ok := client.Object(resource).(webhook.Defaulter); ok {
+	} else if defaulter, ok := client.Object(resource).(objectDefaulter); ok {
 		// resource.Default()
 		defaulter.Default()
 	}
@@ -243,9 +243,11 @@ func (r *AdmissionWebhookAdapter[T]) reconcile(ctx context.Context, req admissio
 	return nil
 }
 
-const admissionRequestStashKey StashKey = "reconciler.io/runtime:admission-request"
-const admissionResponseStashKey StashKey = "reconciler.io/runtime:admission-response"
-const httpRequestStashKey StashKey = "reconciler.io/runtime:http-request"
+const (
+	admissionRequestStashKey  StashKey = "reconciler.io/runtime:admission-request"
+	admissionResponseStashKey StashKey = "reconciler.io/runtime:admission-response"
+	httpRequestStashKey       StashKey = "reconciler.io/runtime:http-request"
+)
 
 func StashAdmissionRequest(ctx context.Context, req admission.Request) context.Context {
 	return context.WithValue(ctx, admissionRequestStashKey, req)

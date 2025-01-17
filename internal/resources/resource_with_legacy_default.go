@@ -1,5 +1,5 @@
 /*
-Copyright 2021 the original author or authors.
+Copyright 2025 the original author or authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,49 +17,44 @@ limitations under the License.
 package resources
 
 import (
-	"context"
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-var _ webhook.CustomDefaulter = &TestResourceNoStatus{}
+var (
+	_ webhook.CustomDefaulter = &TestResource{}
+	_ webhook.CustomValidator = &TestResource{}
+	_ client.Object           = &TestResource{}
+)
 
 // +kubebuilder:object:root=true
 // +genclient
 
-type TestResourceNoStatus struct {
+type TestResourceWithLegacyDefault struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec TestResourceSpec `json:"spec"`
+	Spec   TestResourceSpec   `json:"spec"`
+	Status TestResourceStatus `json:"status"`
 }
 
-func (*TestResourceNoStatus) Default(ctx context.Context, obj runtime.Object) error {
-	r, ok := obj.(*TestResourceNoStatus)
-	if !ok {
-		return fmt.Errorf("expected object to be TestResourceNoStatus")
-	}
-
+func (r *TestResourceWithLegacyDefault) Default() {
 	if r.Spec.Fields == nil {
 		r.Spec.Fields = map[string]string{}
 	}
 	r.Spec.Fields["Defaulter"] = "ran"
-
-	return nil
 }
 
 // +kubebuilder:object:root=true
 
-type TestResourceNoStatusList struct {
+type TestResourceWithLegacyDefaultList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []TestResourceNoStatus `json:"items"`
+	Items []TestResourceWithLegacyDefault `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&TestResourceNoStatus{}, &TestResourceNoStatusList{})
+	SchemeBuilder.Register(&TestResourceWithLegacyDefault{}, &TestResourceWithLegacyDefaultList{})
 }

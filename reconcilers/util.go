@@ -23,6 +23,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// objectDefaulter mirrors the former upstream interface webhook.Defaulter which was deprecated and
+// removed. We use this interface when reconciling a resource to set default values to a common
+// baseline.
+type objectDefaulter interface {
+	Default()
+}
+
 // extractItems returns a typed slice of objects from an object list
 func extractItems[T client.Object](list client.ObjectList) []T {
 	items := []T{}

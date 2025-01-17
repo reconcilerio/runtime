@@ -17,6 +17,9 @@ limitations under the License.
 package resources
 
 import (
+	"context"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -39,11 +42,16 @@ type TestDuck struct {
 	Status TestResourceStatus `json:"status"`
 }
 
-func (r *TestDuck) Default() {
+func (*TestDuck) Default(ctx context.Context, obj runtime.Object) error {
+	r, ok := obj.(*TestDuck)
+	if !ok {
+		return fmt.Errorf("expected obj to be TestDuck")
+	}
 	if r.Spec.Fields == nil {
 		r.Spec.Fields = map[string]string{}
 	}
 	r.Spec.Fields["Defaulter"] = "ran"
+	return  nil
 }
 
 func (r *TestDuck) ValidateCreate() (admission.Warnings, error) {

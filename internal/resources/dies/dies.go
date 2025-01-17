@@ -146,3 +146,6 @@ func (d *TestResourceUnexportedFieldsStatusDie) AddUnexportedField(key, value st
 		r.SetUnexportedFields(f)
 	})
 }
+
+// +die:object=true,spec=TestResourceSpec,status=TestResourceStatus
+type _ = resources.TestResourceWithLegacyDefault

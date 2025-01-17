@@ -17,11 +17,15 @@ limitations under the License.
 package resources
 
 import (
+	"context"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-var _ webhook.Defaulter = &TestResourceNoStatus{}
+var _ webhook.CustomDefaulter = &TestResourceNoStatus{}
 
 // +kubebuilder:object:root=true
 // +genclient
@@ -33,11 +37,18 @@ type TestResourceNoStatus struct {
 	Spec TestResourceSpec `json:"spec"`
 }
 
-func (r *TestResourceNoStatus) Default() {
+func (*TestResourceNoStatus) Default(ctx context.Context, obj runtime.Object) error {
+	r, ok := obj.(*TestResourceNoStatus)
+	if !ok {
+		return fmt.Errorf("expected object to be TestResourceNoStatus")
+	}
+
 	if r.Spec.Fields == nil {
 		r.Spec.Fields = map[string]string{}
 	}
 	r.Spec.Fields["Defaulter"] = "ran"
+
+	return nil
 }
 
 // +kubebuilder:object:root=true

@@ -43,9 +43,7 @@ import (
 	rtime "reconciler.io/runtime/time"
 )
 
-var (
-	_ reconcile.Reconciler = (*ResourceReconciler[client.Object])(nil)
-)
+var _ reconcile.Reconciler = (*ResourceReconciler[client.Object])(nil)
 
 // ResourceReconciler is a controller-runtime reconciler that reconciles a given
 // existing resource. The Type resource is fetched for the reconciler
@@ -274,9 +272,6 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 		if err := defaulter.Default(ctx, resource); err != nil {
 			return Result{}, err
 		}
-	} else if defaulter, ok := client.Object(resource).(webhook.Defaulter); ok {
-		// resource.Default()
-		defaulter.Default()
 	}
 
 	r.initializeConditions(ctx, resource)

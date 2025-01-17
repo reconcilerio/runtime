@@ -272,6 +272,9 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 		if err := defaulter.Default(ctx, resource); err != nil {
 			return Result{}, err
 		}
+	} else if defaulter, ok := client.Object(resource).(objectDefaulter); ok {
+		// resource.Default()
+		defaulter.Default()
 	}
 
 	r.initializeConditions(ctx, resource)

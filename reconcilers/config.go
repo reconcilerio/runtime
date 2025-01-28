@@ -153,7 +153,7 @@ func (r *WithConfig[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, 
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 	c, err := r.Config(ctx, RetrieveConfigOrDie(ctx))
@@ -164,7 +164,7 @@ func (r *WithConfig[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, 
 	return r.Reconciler.SetupWithManager(ctx, mgr, bldr)
 }
 
-func (r *WithConfig[T]) validate(ctx context.Context) error {
+func (r *WithConfig[T]) Validate(ctx context.Context) error {
 	// validate Config value
 	if r.Config == nil {
 		return fmt.Errorf("WithConfig %q must define Config", r.Name)

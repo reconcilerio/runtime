@@ -178,7 +178,7 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 		WithValues("childType", gvk(c, r.ChildType))
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 
@@ -200,7 +200,7 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 	return nil
 }
 
-func (r *ChildReconciler[T, CT, CLT]) validate(ctx context.Context) error {
+func (r *ChildReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
 	// require DesiredChild
 	if r.DesiredChild == nil {
 		return fmt.Errorf("ChildReconciler %q must implement DesiredChild", r.Name)

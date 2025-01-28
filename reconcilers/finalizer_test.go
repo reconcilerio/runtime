@@ -31,6 +31,7 @@ import (
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestWithFinalizer(t *testing.T) {
@@ -231,4 +232,56 @@ func TestWithFinalizer(t *testing.T) {
 			},
 		}
 	})
+}
+
+func TestWithFinalizer_Validate(t *testing.T) {
+	tests := []struct {
+		name       string
+		resource   client.Object
+		reconciler *reconcilers.WithFinalizer[*corev1.ConfigMap]
+		shouldErr  string
+	}{
+		{
+			name:       "empty",
+			resource:   &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{},
+			shouldErr:  `WithFinalizer "" must define Finalizer`,
+		},
+		{
+			name:     "valid",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.Sequence[*corev1.ConfigMap]{},
+				Finalizer:  "my-finalizer",
+			},
+		},
+		{
+			name:     "missing finalizer",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{
+				Name:       "missing finalizer",
+				Reconciler: &reconcilers.Sequence[*corev1.ConfigMap]{},
+			},
+			shouldErr: `WithFinalizer "missing finalizer" must define Finalizer`,
+		},
+		{
+			name:     "missing reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{
+				Name:      "missing reconciler",
+				Finalizer: "my-finalizer",
+			},
+			shouldErr: `WithFinalizer "missing reconciler" must define Reconciler`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := context.TODO()
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+		})
+	}
 }

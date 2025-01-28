@@ -90,13 +90,13 @@ func (r *WithFinalizer[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 	return r.Reconciler.SetupWithManager(ctx, mgr, bldr)
 }
 
-func (r *WithFinalizer[T]) validate(ctx context.Context) error {
+func (r *WithFinalizer[T]) Validate(ctx context.Context) error {
 	// validate Finalizer value
 	if r.Finalizer == "" {
 		return fmt.Errorf("WithFinalizer %q must define Finalizer", r.Name)

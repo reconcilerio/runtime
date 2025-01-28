@@ -32,6 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+type Validator interface {
+	Validate(ctx context.Context) error
+}
+
 // ReconcilerTestCase holds a single test case of a reconciler test suite.
 type ReconcilerTestCase struct {
 	// Name is a descriptive name for this test suitable as a first argument to t.Run()
@@ -208,6 +212,11 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	ctx = reconcilers.StashAdditionalConfigs(ctx, configs)
 
 	r := factory(t, tc, expectConfig.Config())
+	if v, ok := r.(Validator); ok {
+		if err := v.Validate(ctx); err != nil {
+			t.Fatalf("reconciler validation failed: %s", err)
+		}
+	}
 
 	// Run the Reconcile we're testing.
 	result, err := r.Reconcile(ctx, tc.Request)

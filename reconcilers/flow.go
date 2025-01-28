@@ -77,7 +77,7 @@ func (r *IfThen[T]) init() {
 	})
 }
 
-func (r *IfThen[T]) validate(ctx context.Context) error {
+func (r *IfThen[T]) Validate(ctx context.Context) error {
 	// require If
 	if r.If == nil {
 		return fmt.Errorf("IfThen %q must implement If", r.Name)
@@ -98,7 +98,7 @@ func (r *IfThen[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 
@@ -213,7 +213,7 @@ func (r *While[T]) init() {
 	})
 }
 
-func (r *While[T]) validate(ctx context.Context) error {
+func (r *While[T]) Validate(ctx context.Context) error {
 	// require If
 	if r.Condition == nil {
 		return fmt.Errorf("While %q must implement Condition", r.Name)
@@ -234,7 +234,7 @@ func (r *While[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr 
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 
@@ -314,7 +314,7 @@ func (r *ForEach[T, I]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, 
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 	if err := r.Reconciler.SetupWithManager(ctx, mgr, bldr); err != nil {
@@ -326,7 +326,7 @@ func (r *ForEach[T, I]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, 
 	return r.Setup(ctx, mgr, bldr)
 }
 
-func (r *ForEach[T, I]) validate(ctx context.Context) error {
+func (r *ForEach[T, I]) Validate(ctx context.Context) error {
 	// validate Reconciler
 	if r.Reconciler == nil {
 		return fmt.Errorf("ForEach %q must implement Reconciler", r.Name)
@@ -450,7 +450,7 @@ func (r *TryCatch[T]) init() {
 	})
 }
 
-func (r *TryCatch[T]) validate(ctx context.Context) error {
+func (r *TryCatch[T]) Validate(ctx context.Context) error {
 	// require Try
 	if r.Try == nil {
 		return fmt.Errorf("TryCatch %q must implement Try", r.Name)
@@ -466,7 +466,7 @@ func (r *TryCatch[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bl
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 
@@ -546,7 +546,7 @@ func (r *OverrideSetup[T]) init() {
 	})
 }
 
-func (r *OverrideSetup[T]) validate(ctx context.Context) error {
+func (r *OverrideSetup[T]) Validate(ctx context.Context) error {
 	if r.Setup == nil && r.Reconciler == nil {
 		return fmt.Errorf("OverrideSetup %q must implement at least one of Setup or Reconciler", r.Name)
 	}
@@ -561,7 +561,7 @@ func (r *OverrideSetup[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 

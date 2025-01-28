@@ -117,7 +117,7 @@ func (r *UpdatingObjectManager[T]) init() {
 // Deprecated call SetupWithManager instead
 func (r *UpdatingObjectManager[T]) Setup(ctx context.Context) error {
 	r.init()
-	return r.validate(ctx)
+	return r.Validate(ctx)
 }
 
 func (r *UpdatingObjectManager[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
@@ -132,7 +132,7 @@ func (r *UpdatingObjectManager[T]) SetupWithManager(ctx context.Context, mgr ctr
 	return nil
 }
 
-func (r *UpdatingObjectManager[T]) validate(ctx context.Context) error {
+func (r *UpdatingObjectManager[T]) Validate(ctx context.Context) error {
 	// require MergeBeforeUpdate
 	if r.MergeBeforeUpdate == nil {
 		return fmt.Errorf("UpdatingObjectManager %q must define MergeBeforeUpdate", r.Name)

@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -535,4 +537,104 @@ func TestAggregateReconciler(t *testing.T) {
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.ReconcilerTestCase, c reconcilers.Config) reconcile.Reconciler {
 		return rtc.Metadata["Reconciler"].(func(*testing.T, reconcilers.Config) reconcile.Reconciler)(t, c)
 	})
+}
+
+func TestAggregateReconciler_Validate(t *testing.T) {
+	req := reconcilers.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: "my-namespace",
+			Name:      "my-name",
+		},
+	}
+
+	tests := []struct {
+		name         string
+		reconciler   *reconcilers.AggregateReconciler[*resources.TestResource]
+		shouldErr    string
+		expectedLogs []string
+	}{
+		{
+			name:       "empty",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{},
+			shouldErr:  `AggregateReconciler "" must define Request`,
+		},
+		{
+			name: "valid",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Type:                   &resources.TestResource{},
+				Request:                req,
+				Reconciler:             reconcilers.Sequence[*resources.TestResource]{},
+				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			},
+		},
+		{
+			name: "Type missing",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Name: "Type missing",
+				// Type:              &resources.TestResource{},
+				Request:                req,
+				Reconciler:             reconcilers.Sequence[*resources.TestResource]{},
+				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			},
+		},
+		{
+			name: "Request missing",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Name: "Request missing",
+				Type: &resources.TestResource{},
+				// Request:           req,
+				Reconciler:             reconcilers.Sequence[*resources.TestResource]{},
+				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			},
+			shouldErr: `AggregateReconciler "Request missing" must define Request`,
+		},
+		{
+			name: "Reconciler missing",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Name:    "Reconciler missing",
+				Type:    &resources.TestResource{},
+				Request: req,
+				// Reconciler:        Sequence{},
+				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			},
+			shouldErr: `AggregateReconciler "Reconciler missing" must define Reconciler and/or DesiredResource`,
+		},
+		{
+			name: "DesiredResource",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Type:       &resources.TestResource{},
+				Request:    req,
+				Reconciler: reconcilers.Sequence[*resources.TestResource]{},
+				DesiredResource: func(ctx context.Context, resource *resources.TestResource) (*resources.TestResource, error) {
+					return nil, nil
+				},
+				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			},
+		},
+		{
+			name: "AggregateObjectManager missing",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Name:       "AggregateObjectManager missing",
+				Type:       &resources.TestResource{},
+				Request:    req,
+				Reconciler: reconcilers.Sequence[*resources.TestResource]{},
+				// AggregateObjectManager: &UpdatingObjectManager[*resources.TestResource]{},
+			},
+			shouldErr: `AggregateReconciler "AggregateObjectManager missing" must define AggregateObjectManager`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			}
+		})
+	}
 }

@@ -30,6 +30,7 @@ import (
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -131,8 +132,11 @@ func TestAdvice(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					// this reconciler would fail validation, but more directly expresses the desired behavior
 					return &reconcilers.Advice[*resources.TestResource]{
+						Before: func(ctx context.Context, resource *resources.TestResource) (context.Context, reconcilers.Result, error) {
+							// required to pass validation
+							return ctx, reconcile.Result{}, nil
+						},
 						Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
 							Sync: func(ctx context.Context, resource *resources.TestResource) error {
 								c := reconcilers.RetrieveConfigOrDie(ctx)
@@ -224,4 +228,84 @@ func TestAdvice(t *testing.T) {
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*resources.TestResource], c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c)
 	})
+}
+
+func TestAdvice_Validate(t *testing.T) {
+	tests := []struct {
+		name       string
+		resource   client.Object
+		reconciler *reconcilers.Advice[*corev1.ConfigMap]
+		shouldErr  string
+	}{
+		{
+			name:       "empty",
+			resource:   &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{},
+			shouldErr:  `Advice "" must implement Reconciler`,
+		},
+		{
+			name:     "reconciler only",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
+			},
+			shouldErr: `Advice "" must implement at least one of Before, Around or After`,
+		},
+		{
+			name:     "valid",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
+				Before: func(ctx context.Context, resource *corev1.ConfigMap) (context.Context, reconcile.Result, error) {
+					return nil, reconcile.Result{}, nil
+				},
+				Around: func(ctx context.Context, resource *corev1.ConfigMap, reconciler reconcilers.SubReconciler[*corev1.ConfigMap]) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+				After: func(ctx context.Context, resource *corev1.ConfigMap, result reconcile.Result, err error) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "valid before",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
+				Before: func(ctx context.Context, resource *corev1.ConfigMap) (context.Context, reconcile.Result, error) {
+					return nil, reconcile.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "valid around",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
+				Around: func(ctx context.Context, resource *corev1.ConfigMap, reconciler reconcilers.SubReconciler[*corev1.ConfigMap]) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "valid after",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
+				After: func(ctx context.Context, resource *corev1.ConfigMap, result reconcile.Result, err error) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := reconcilers.StashResourceType(context.TODO(), c.resource)
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+		})
+	}
 }

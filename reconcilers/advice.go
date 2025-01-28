@@ -110,7 +110,7 @@ func (r *Advice[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr
 	if r.Setup == nil {
 		return nil
 	}
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 	if err := r.Setup(ctx, mgr, bldr); err != nil {
@@ -119,7 +119,7 @@ func (r *Advice[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr
 	return r.Reconciler.SetupWithManager(ctx, mgr, bldr)
 }
 
-func (r *Advice[T]) validate(ctx context.Context) error {
+func (r *Advice[T]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("Advice %q must implement Reconciler", r.Name)
 	}

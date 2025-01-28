@@ -327,3 +327,67 @@ func TestWithConfig(t *testing.T) {
 		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c)
 	})
 }
+
+func TestWithConfig_Validate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = resources.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	config := reconcilers.Config{
+		Tracker: tracker.New(scheme, 0),
+	}
+
+	tests := []struct {
+		name       string
+		resource   client.Object
+		reconciler *reconcilers.WithConfig[*corev1.ConfigMap]
+		shouldErr  string
+	}{
+		{
+			name:       "empty",
+			resource:   &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{},
+			shouldErr:  `WithConfig "" must define Config`,
+		},
+		{
+			name:     "valid",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.Sequence[*corev1.ConfigMap]{},
+				Config: func(ctx context.Context, c reconcilers.Config) (reconcilers.Config, error) {
+					return config, nil
+				},
+			},
+		},
+		{
+			name:     "missing config",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{
+				Name:       "missing config",
+				Reconciler: &reconcilers.Sequence[*corev1.ConfigMap]{},
+			},
+			shouldErr: `WithConfig "missing config" must define Config`,
+		},
+		{
+			name:     "missing reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{
+				Name: "missing reconciler",
+				Config: func(ctx context.Context, c reconcilers.Config) (reconcilers.Config, error) {
+					return config, nil
+				},
+			},
+			shouldErr: `WithConfig "missing reconciler" must define Reconciler`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := context.TODO()
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+		})
+	}
+}

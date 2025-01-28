@@ -407,6 +407,40 @@ func TestChildReconciler(t *testing.T) {
 				configMapCreate,
 			},
 		},
+		"invalid child - return error rather than reflect": {
+			Resource: resourceReady.
+				SpecDie(func(d *dies.TestResourceSpecDie) {
+					d.AddField("foo", "bar")
+				}).
+				DieReleasePtr(),
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("create", "ConfigMap", rtesting.InduceFailureOpts{
+					Error: apierrs.NewInvalid(schema.GroupKind{}, testName, field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), testName, ""),
+					}),
+				}),
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					r := defaultChildReconciler(c)
+					// suppress all error reflection
+					r.ReflectedChildErrorReasons = []metav1.StatusReason{}
+					r.ReflectChildStatusOnParent = func(ctx context.Context, parent *resources.TestResource, child *corev1.ConfigMap, err error) {
+						t.Fatalf("ReflectChildStatusOnParent should not be called")
+					}
+					return r
+				},
+			},
+			ShouldErr: true,
+			ExpectResource: resourceReady.
+				SpecDie(func(d *dies.TestResourceSpecDie) {
+					d.AddField("foo", "bar")
+				}).
+				DieReleasePtr(),
+			ExpectCreates: []client.Object{
+				configMapCreate,
+			},
+		},
 		"child name collision": {
 			Resource: resourceReady.
 				SpecDie(func(d *dies.TestResourceSpecDie) {

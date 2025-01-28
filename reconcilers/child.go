@@ -95,13 +95,22 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	DesiredChild func(ctx context.Context, resource Type) (ChildType, error)
 
 	// ReflectChildStatusOnParent updates the reconciled resource's status with values from the
-	// child. Select types of errors are passed, including:
-	//   - apierrs.IsAlreadyExists
-	//   - apierrs.IsInvalid
+	// child. Most errors are returned directly, skipping this method. The set of handled error
+	// reasons is defined by ReflectedChildErrorReasons.
 	//
-	// Most errors are returned directly, skipping this method. The set of handled error types
-	// may grow, implementations should be defensive rather than assuming the error type.
+	// The default set of reflected errors may change. Implementations should be defensive in
+	// handling an unknown error reason.
 	ReflectChildStatusOnParent func(ctx context.Context, parent Type, child ChildType, err error)
+
+	// ReflectedChildErrorReasons are client errors when managing the child resource that are handled by
+	// ReflectChildStatusOnParent. Error reasons not listed are returned directly from the
+	// ChildReconciler as an error so that the reconcile request can be retried.
+	//
+	// If not specified, the default reasons are:
+	//   - metav1.StatusReasonAlreadyExists
+	//   - metav1.StatusReasonForbidden
+	//   - metav1.StatusReasonInvalid
+	ReflectedChildErrorReasons []metav1.StatusReason
 
 	// ChildObjectManager synchronizes the desired child state to the API Server.
 	ChildObjectManager ObjectManager[ChildType]
@@ -148,6 +157,13 @@ func (r *ChildReconciler[T, CT, CLT]) init() {
 		}
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sChildReconciler", typeName(r.ChildType))
+		}
+		if r.ReflectedChildErrorReasons == nil {
+			r.ReflectedChildErrorReasons = []metav1.StatusReason{
+				metav1.StatusReasonAlreadyExists,
+				metav1.StatusReasonForbidden,
+				metav1.StatusReasonInvalid,
+			}
 		}
 	})
 }
@@ -228,37 +244,44 @@ func (r *ChildReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource T)
 		return Result{}, err
 	}
 	if err != nil {
-		switch {
-		case apierrs.IsAlreadyExists(err):
-			// check if the resource blocking create is owned by the reconciled resource.
-			// the created child from a previous turn may be slow to appear in the informer cache, but shouldn't appear
-			// on the reconciled resource as being not ready.
-			apierr := err.(apierrs.APIStatus)
-			conflicted := r.ChildType.DeepCopyObject().(CT)
-			_ = c.APIReader.Get(ctx, types.NamespacedName{Namespace: resource.GetNamespace(), Name: apierr.Status().Details.Name}, conflicted)
-			if r.ourChild(resource, conflicted) {
-				// skip updating the reconciled resource's status, fail and try again
-				return Result{}, err
+		if r.shouldReflectError(err) {
+			if apierrs.IsAlreadyExists(err) {
+				// check if the resource blocking create is owned by the reconciled resource.
+				// the created child from a previous turn may be slow to appear in the informer cache, but shouldn't appear
+				// on the reconciled resource as being not ready.
+				apierr := err.(apierrs.APIStatus)
+				conflicted := r.ChildType.DeepCopyObject().(CT)
+				_ = c.APIReader.Get(ctx, types.NamespacedName{Namespace: resource.GetNamespace(), Name: apierr.Status().Details.Name}, conflicted)
+				if r.ourChild(resource, conflicted) {
+					// skip updating the reconciled resource's status, fail and try again
+					return Result{}, err
+				}
+				log.Info("unable to reconcile child, not owned", "child", namespaceName(conflicted), "ownerRefs", conflicted.GetOwnerReferences())
+				if !r.SkipOwnerReference {
+					// manually track to watch for deletion since the existing resource is not owned by us
+					c.Tracker.TrackObject(conflicted, resource)
+				}
 			}
-			log.Info("unable to reconcile child, not owned", "child", namespaceName(conflicted), "ownerRefs", conflicted.GetOwnerReferences())
-			if !r.SkipOwnerReference {
-				// manually track to watch for deletion since the existing resource is not owned by us
-				c.Tracker.TrackObject(conflicted, resource)
-			}
-			r.ReflectChildStatusOnParent(ctx, resource, child, err)
-			return Result{}, nil
-		case apierrs.IsInvalid(err):
+
 			r.ReflectChildStatusOnParent(ctx, resource, child, err)
 			return Result{}, nil
 		}
-		if !errors.Is(err, ErrQuiet) {
-			log.Error(err, "unable to reconcile child")
-		}
+
 		return Result{}, err
 	}
 	r.ReflectChildStatusOnParent(ctx, resource, child, nil)
 
 	return Result{}, nil
+}
+
+func (r *ChildReconciler[T, CT, CLT]) shouldReflectError(err error) bool {
+	reason := apierrs.ReasonForError(err)
+	for _, r := range r.ReflectedChildErrorReasons {
+		if reason == r {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *ChildReconciler[T, CT, CLT]) reconcile(ctx context.Context, resource T) (CT, error) {

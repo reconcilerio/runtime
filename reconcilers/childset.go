@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"reconciler.io/runtime/internal"
@@ -106,16 +107,25 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	ChildObjectManager ObjectManager[ChildType]
 
 	// ReflectChildrenStatusOnParent updates the reconciled resource's status with values from the
-	// child reconciliations. Select types of errors are captured, including:
-	//   - apierrs.IsAlreadyExists
-	//   - apierrs.IsInvalid
+	// child reconciliations. Most errors are returned directly, skipping this method. The set of
+	// handled error reasons is defined by ReflectedChildErrorReasons.
 	//
-	// Most errors are returned directly, skipping this method. The set of handled error types
-	// may grow, implementations should be defensive rather than assuming the error type.
+	// The default set of reflected errors may change. Implementations should be defensive in
+	// handling an unknown error reason.
 	//
 	// Results contain the union of desired and actual child resources, in the order they were
 	// reconciled, (sorted by identifier).
 	ReflectChildrenStatusOnParent func(ctx context.Context, parent Type, result ChildSetResult[ChildType])
+
+	// ReflectedChildErrorReasons are client errors when managing the child resource that are
+	// handled by ReflectChildrenStatusOnParent. Error reasons not listed are returned directly
+	// from the ChildSetReconciler as an error so that the reconcile request can be retried.
+	//
+	// If not specified, the default reasons are:
+	//   - metav1.StatusReasonAlreadyExists
+	//   - metav1.StatusReasonForbidden
+	//   - metav1.StatusReasonInvalid
+	ReflectedChildErrorReasons []metav1.StatusReason
 
 	// ListOptions allows custom options to be use when listing potential child resources. Each
 	// resource retrieved as part of the listing is confirmed via OurChild. There is a performance
@@ -223,7 +233,8 @@ func (r *ChildSetReconciler[T, CT, CLT]) childReconcilerFor(desired CT, desiredE
 			})
 			childSetResultStasher[CT]().Store(ctx, result)
 		},
-		ListOptions: r.ListOptions,
+		ReflectedChildErrorReasons: r.ReflectedChildErrorReasons,
+		ListOptions:                r.ListOptions,
 		OurChild: func(resource T, child CT) bool {
 			if r.OurChild != nil && !r.OurChild(resource, child) {
 				return false

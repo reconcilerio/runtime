@@ -3,7 +3,7 @@ module reconciler.io/runtime
 go 1.23.0
 
 require (
-	github.com/evanphx/json-patch/v5 v5.9.0
+	github.com/evanphx/json-patch/v5 v5.9.10
 	github.com/fatih/color v1.18.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0

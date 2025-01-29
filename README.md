@@ -71,14 +71,14 @@ The controller-runtime client is able to work with structured and unstructured o
 
 ### ResourceReconciler
 
-A [`ResourceReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceReconciler) (formerly ParentReconciler) is responsible for orchestrating the reconciliation of a single resource. The reconciler delegates the manipulation of other resources to SubReconcilers.
+A [`ResourceReconciler`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceReconciler) (formerly `ParentReconciler`) is responsible for orchestrating the reconciliation of a single resource. The reconciler delegates the manipulation of other resources to SubReconcilers.
 
 The resource reconciler is responsible for:
 - fetching the resource being reconciled
 - creating a stash to pass state between sub reconcilers
 - passing the resource to each sub reconciler in turn
-- initialize conditions on the status by calling status.InitializeConditions() if defined (not available for Unstructured resources)
-- normalizing the .status.conditions[].lastTransitionTime for status conditions that are metav1.Condition (the previous timestamp is preserved if the condition is otherwise unchanged) (not available for Unstructured resources)
+- initialize conditions on the status by calling `status.InitializeConditions()` if defined (not available for Unstructured resources)
+- normalizing the `.status.conditions[].lastTransitionTime` for status conditions that are `metav1.Condition` (the previous timestamp is preserved if the condition is otherwise unchanged) (not available for Unstructured resources)
 - reflects the observed generation on the status (not available for Unstructured resources)
 - updates the resource status if it was modified
 - logging the reconcilers activities
@@ -89,7 +89,7 @@ The implementor is responsible for:
 
 **Example:**
 
-Resource reconcilers tend to be quite simple, as they delegate their work to sub reconcilers. We'll use an example from projectriff of the Function resource, which uses Kpack to build images from a git repo. In this case the FunctionTargetImageReconciler resolves the target image for the function, and FunctionChildImageReconciler creates a child Kpack Image resource based on the resolve value. 
+Resource reconcilers tend to be quite simple, as they delegate their work to sub reconcilers. We'll use an example from projectriff of the Function resource, which uses Kpack to build images from a git repo. In this case the `FunctionTargetImageReconciler` resolves the target image for the function, and `FunctionChildImageReconciler` creates a child Kpack Image resource based on the resolve value. 
 
 ```go
 func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*buildv1alpha1.Function] {
@@ -412,9 +412,9 @@ Higher order reconcilers are SubReconcilers that do not perform work directly, b
 
 #### CastResource
 
-A [`CastResource`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CastResource) (formerly CastParent) casts the ResourceReconciler's type by projecting the resource data onto a new struct. Casting the reconciled resource is useful to create cross cutting reconcilers that can operate on common portion of multiple  resource kinds, commonly referred to as a duck type.
+A [`CastResource`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CastResource) (formerly `CastParent`) casts the `ResourceReconciler`'s type by projecting the resource data onto a new struct. Casting the reconciled resource is useful to create cross cutting reconcilers that can operate on common portion of multiple  resource kinds, commonly referred to as a duck type.
 
-The `CastResource` can also be used to bridge a `SubReconciler` for a specific struct to a generic SubReconciler that can process any object by using `client.Object` as the CastType generic type. In this case, the resource is passed through without coercion.
+The `CastResource` can also be used to bridge a `SubReconciler` for a specific struct to a generic `SubReconciler` that can process any object by using `client.Object` as the `CastType` generic type. In this case, the resource is passed through without coercion.
 
 **Example:**
 
@@ -443,11 +443,11 @@ func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*b
 
 #### Sequence
 
-A [`Sequence`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Sequence) composes multiple SubReconcilers as a single SubReconciler. Each sub reconciler is called in turn, aggregating the result of each sub reconciler. A reconciler returning an error will interrupt the sequence.
+A [`Sequence`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Sequence) composes multiple `SubReconciler`s as a single `SubReconciler`. Each sub reconciler is called in turn, aggregating the result of each sub reconciler. A reconciler returning an error will interrupt the sequence.
 
 **Example:**
 
-A Sequence is commonly used in a ResourceReconciler, but may be used anywhere a SubReconciler is accepted. 
+A `Sequence` is commonly used in a `ResourceReconcile`, but may be used anywhere a `SubReconciler` is accepted. 
 
 ```go
 func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*buildv1alpha1.Function] {
@@ -465,11 +465,11 @@ func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*b
 
 #### Advice
 
-[`Advice`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Advice) is a sub reconciler for advising the lifecycle of another sub reconciler in an aspect oriented programming (AOP) style. `Before` is called before the delegated reconciler and `After` afterward. `Around` is used between Before and After to have full control over how the delegated reconciler is called, including suppressing the call, modifying the input or result, or calling the reconciler multiple times.
+[`Advice`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Advice) is a `SubReconciler` for advising the lifecycle of another sub reconciler in an aspect oriented programming (AOP) style. `Before` is called before the delegated reconciler and `After` afterward. `Around` is used between `Before` and `After` to have full control over how the delegated reconciler is called, including suppressing the call, modifying the input or result, or calling the reconciler multiple times.
 
 **Example:**
 
-Advice can be used to control calls to a reconciler at a lower level. In this case the reconciler is called twice aggregating the results while returning immediately on error.
+`Advice` can be used to control calls to a reconciler at a lower level. In this case the reconciler is called twice aggregating the results while returning immediately on error.
 
 ```go
 func CallTwice(reconciler reconciler.SubReconciler[*buildv1alpha1.Function]) *reconcilers.SubReconciler[*buildv1alpha1.Function] {
@@ -496,7 +496,7 @@ An [`IfThen`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#IfThen) branc
 
 **Example:**
 
-An IfThen can be used to gate a capability of the reconciler only for a resource that opts-in to the behavior. 
+An `IfThen` can be used to gate a capability of the reconciler only for a resource that opts-in to the behavior. 
 
 ```go
 func GatedReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
@@ -519,7 +519,7 @@ This reconciler must not be used to wait for external state to change, or for po
 
 **Example:**
 
-An While can be used to fan out. 
+A `While` can be used to fan out. 
 
 ```go
 func TenTimesReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
@@ -539,13 +539,13 @@ func TenTimesReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
 
 #### ForEach
 
-A [`ForEach`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ForEach) calls the reconciler for each item returned from Items. A cursor marks the item being reconciled. The current cursor can be retrieved with [`CursorStasher`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CursorStasher).
+A [`ForEach`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ForEach) calls the reconciler for each item returned from `Item`s. A cursor marks the item being reconciled. The current cursor can be retrieved with [`CursorStasher`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#CursorStasher).
 
 Nested iteration is allowed so long as the types being iterated over contain unique names. Otherwise the stash keys will collide. For testing the nested reconciler outside the scope of the loop, use the CursorStasher's Key method to lookup the StashKey, do not expect the StashKey to be stable between releases.
 
 **Example:**
 
-A ForEach can be used to interact with each volume mount on a pod. 
+A `ForEach` can be used to interact with each volume mount on a pod. 
 
 ```go
 func VolumeMountReconciler() *reconcilers.SubReconciler[*corev1.Pod] {
@@ -608,7 +608,7 @@ An [`OverrideSetup`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Overri
 
 **Example:**
 
-OverrideSetup is useful when the default setup behavior for a reconciler is problematic in a particular context.
+`OverrideSetup` is useful when the default setup behavior for a reconciler is problematic in a particular context.
 
 ```go
 func CustomSetupReconciler() *reconcilers.SubReconciler[*buildv1alpha1.Function] {
@@ -666,7 +666,8 @@ func SwapRESTConfig(rc *rest.Config) *reconcilers.SubReconciler[*resources.MyRes
 
 The [Finalizers](#finalizers) utilities are used to manage the finalizer on the reconciled resource.
 
-> Warning: It is crucial that each WithFinalizer have a unique and stable finalizer name. Two reconcilers that use the same finalizer, or a reconciler that changed the name of its finalizer, may leak the external state when the reconciled resource is deleted, or the resource may never terminate.
+> [!WARNING]
+> It is crucial that each `WithFinalizer` have a unique and stable finalizer name. Two reconcilers that use the same finalizer, or a reconciler that changed the name of its finalizer, may leak the external state when the reconciled resource is deleted, or the resource may never terminate.
 
 **Example:**
 
@@ -873,7 +874,7 @@ rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*strea
 
 **Example**
 
-Service bindings project into workloads with a controller and a mutating webhook. The admission request for the workload resource along with a given ServiceBinding resource is projected mutating the resource, which is treated as a patch in the admission response.
+Service bindings project into workloads with a controller and a mutating webhook. The admission request for the workload resource along with a given `ServiceBinding` resource is projected mutating the resource, which is treated as a patch in the admission response.
 
 ```go
 workload := dieappsv1.DeploymentBlank.
@@ -1082,13 +1083,14 @@ type MyResource struct {
 
 Deleting a resource that uses finalizers requires the controller to be running.
 
-> Note: [WithFinalizer](#withfinalizer) can be used in lieu of, or in conjunction with, [ChildReconciler](#childreconciler)#Finalizer. The distinction is the scope within the reconciler tree where a finalizer is applied. While a reconciler can define as many finalizers on the resource as it desires, in practice, it's best to minimize the number of finalizers as setting and clearing each finalizer makes a request to the API Server. 
+> [!NOTE] 
+> [WithFinalizer](#withfinalizer) can be used in lieu of, or in conjunction with, [ChildReconciler](#childreconciler)#Finalizer. The distinction is the scope within the reconciler tree where a finalizer is applied. While a reconciler can define as many finalizers on the resource as it desires, in practice, it's best to minimize the number of finalizers as setting and clearing each finalizer makes a request to the API Server. 
 >
 > A single WithFinalizer will always add a finalizer to the reconciled resource. It can then compose multiple ChildReconcilers, as well as other reconcilers that do not natively support managing finalizers (e.g. SyncReconciler). On the other hand, the ChildReconciler will only set the finalizer when it is required potentially reducing the number of finalizers, but only covers that exact sub-reconciler. It's important the external state that needs to be cleaned up be covered by a finalizer, it does not matter which finalizer is used.
 
-The [AddFinalizer](https://pkg.go.dev/reconciler.io/runtime/reconcilers#AddFinalizer) and [ClearFinalizer](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ClearFinalizer) functions patch the reconciled resource to update its finalizers. These methods work with [CastResource](#castresource) resources and use the same client the [ResourceReconciler](#resourcereconciler) used to originally load the reconciled resource. They can be called inside [SubReconcilers](#subreconciler) that may use a different client.
+The [`AddFinalizer`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#AddFinalizer) and [`ClearFinalizer`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ClearFinalizer) functions patch the reconciled resource to update its finalizers. These methods work with [CastResource](#castresource) resources and use the same client the [ResourceReconciler](#resourcereconciler) used to originally load the reconciled resource. They can be called inside [SubReconcilers](#subreconciler) that may use a different client.
 
-When an update is required, only the `.metadata.finalizers` field is patched. The reconciled resource's `.metadata.resourceVersion` is used as an optimistic concurrency lock, and is updated with the value returned from the server. Any error from the server will cause the resource reconciliation to err. When testing with [SubReconcilerTests](#subreconcilertests), the resource version of the resource defaults to `"999"`, the patch bytes include the resource version and the response increments the reonciled resource's version. For a resource with the default version that patches a finalizer, the expected reconciled resource will have a resource version of `"1000"`.
+When an update is required, only the `.metadata.finalizers` field is patched. The reconciled resource's `.metadata.resourceVersion` is used as an optimistic concurrency lock, and is updated with the value returned from the server. Any error from the server will cause the resource reconciliation to error. When testing with [SubReconcilerTests](#subreconcilertests), the resource version of the resource defaults to `"999"`, the patch bytes include the resource version and the response increments the reonciled resource's version. For a resource with the default version that patches a finalizer, the expected reconciled resource will have a resource version of `"1000"`.
 
 A minimal test case for a sub reconciler that adds a finalizer may look like:
 

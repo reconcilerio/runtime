@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1661,4 +1662,150 @@ func TestResourceReconciler_LegacyDefault(t *testing.T) {
 			Config:           c,
 		}
 	})
+}
+
+func TestResourceReconciler_Validate_TestResource(t *testing.T) {
+	tests := []struct {
+		name         string
+		reconciler   *reconcilers.ResourceReconciler[*resources.TestResource]
+		shouldErr    string
+		expectedLogs []string
+	}{
+		{
+			name: "valid",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResource]{
+				Reconciler: reconcilers.Sequence[*resources.TestResource]{},
+			},
+		},
+		{
+			name: "with type",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResource]{
+				Name:       "with type",
+				Type:       &resources.TestResource{},
+				Reconciler: reconcilers.Sequence[*resources.TestResource]{},
+			},
+		},
+		{
+			name: "missing reconciler",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResource]{
+				Name: "missing reconciler",
+			},
+			shouldErr: `ResourceReconciler "missing reconciler" must define Reconciler`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			}
+		})
+	}
+}
+
+func TestResourceReconciler_Validate_TestResourceNoStatus(t *testing.T) {
+	tests := []struct {
+		name         string
+		reconciler   *reconcilers.ResourceReconciler[*resources.TestResourceNoStatus]
+		shouldErr    string
+		expectedLogs []string
+	}{
+		{
+			name: "type has no status",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResourceNoStatus]{
+				Reconciler: reconcilers.Sequence[*resources.TestResourceNoStatus]{},
+			},
+			expectedLogs: []string{
+				"resource missing status field, operations related to status will be skipped",
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			}
+		})
+	}
+}
+
+func TestResourceReconciler_Validate_TestResourceEmptyStatus(t *testing.T) {
+	tests := []struct {
+		name         string
+		reconciler   *reconcilers.ResourceReconciler[*resources.TestResourceEmptyStatus]
+		shouldErr    string
+		expectedLogs []string
+	}{
+		{
+			name: "type has empty status",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResourceEmptyStatus]{
+				Reconciler: reconcilers.Sequence[*resources.TestResourceEmptyStatus]{},
+			},
+			expectedLogs: []string{
+				"resource status missing ObservedGeneration field of type int64, generation will not be managed",
+				"resource status missing InitializeConditions(context.Context) method, conditions will not be auto-initialized",
+				"resource status is missing field Conditions of type []metav1.Condition, condition timestamps will not be managed",
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			}
+		})
+	}
+}
+
+func TestResourceReconciler_Validate_TestResourceNilableStatus(t *testing.T) {
+	tests := []struct {
+		name         string
+		reconciler   *reconcilers.ResourceReconciler[*resources.TestResourceNilableStatus]
+		shouldErr    string
+		expectedLogs []string
+	}{
+		{
+			name: "type has nilable status",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResourceNilableStatus]{
+				Reconciler: reconcilers.Sequence[*resources.TestResourceNilableStatus]{},
+			},
+			expectedLogs: []string{
+				"resource status is nilable, status is typically a struct",
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			}
+		})
+	}
 }

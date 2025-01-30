@@ -228,6 +228,11 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	c := expectConfig.Config()
 
 	r := factory(t, tc, c)
+	if v, ok := r.(Validator); ok {
+		if err := v.Validate(ctx); err != nil {
+			t.Fatalf("subreconciler validation failed: %s", err)
+		}
+	}
 
 	for k, v := range tc.GivenStashedValues {
 		if f, ok := v.(runtime.Object); ok {

@@ -160,7 +160,7 @@ func (r *AggregateReconciler[T]) SetupWithManagerYieldingController(ctx context.
 	ctx = StashResourceType(ctx, r.Type)
 	ctx = StashOriginalResourceType(ctx, r.Type)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return nil, err
 	}
 
@@ -192,7 +192,7 @@ func (r *AggregateReconciler[T]) SetupWithManagerYieldingController(ctx context.
 	return bldr.Build(r)
 }
 
-func (r *AggregateReconciler[T]) validate(ctx context.Context) error {
+func (r *AggregateReconciler[T]) Validate(ctx context.Context) error {
 	// validate Request value
 	if r.Request.Name == "" {
 		return fmt.Errorf("AggregateReconciler %q must define Request", r.Name)

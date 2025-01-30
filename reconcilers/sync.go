@@ -96,13 +96,13 @@ func (r *SyncReconciler[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	if r.Setup == nil {
 		return nil
 	}
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 	return r.Setup(ctx, mgr, bldr)
 }
 
-func (r *SyncReconciler[T]) validate(ctx context.Context) error {
+func (r *SyncReconciler[T]) Validate(ctx context.Context) error {
 	// validate Sync and SyncWithResult
 	if r.Sync == nil && r.SyncWithResult == nil {
 		return fmt.Errorf("SyncReconciler %q must implement Sync or SyncWithResult", r.Name)

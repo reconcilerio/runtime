@@ -142,7 +142,7 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 	ctx = StashResourceType(ctx, r.Type)
 	ctx = StashOriginalResourceType(ctx, r.Type)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return nil, err
 	}
 
@@ -171,7 +171,7 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 	return bldr.Build(r)
 }
 
-func (r *ResourceReconciler[T]) validate(ctx context.Context) error {
+func (r *ResourceReconciler[T]) Validate(ctx context.Context) error {
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("ResourceReconciler %q must define Reconciler", r.Name)

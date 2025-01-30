@@ -17,11 +17,13 @@ limitations under the License.
 package reconcilers_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -454,6 +456,75 @@ func TestUpdatingObjectManager(t *testing.T) {
 		}
 	})
 
+}
+
+func TestUpdatingObjectManager_Validate(t *testing.T) {
+	tests := []struct {
+		name         string
+		reconciler   *reconcilers.UpdatingObjectManager[*resources.TestResource]
+		shouldErr    string
+		expectedLogs []string
+	}{
+		{
+			name:       "empty",
+			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			shouldErr:  `UpdatingObjectManager "" must define MergeBeforeUpdate`,
+		},
+		{
+			name: "valid",
+			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+				Type:              &resources.TestResource{},
+				MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
+			},
+		},
+		{
+			name: "Type missing",
+			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+				Name: "Type missing",
+				// Type:              &resources.TestResource{},
+				MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
+			},
+		},
+		{
+			name: "MergeBeforeUpdate missing",
+			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+				Name: "MergeBeforeUpdate missing",
+				Type: &resources.TestResource{},
+				// MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
+			},
+			shouldErr: `UpdatingObjectManager "MergeBeforeUpdate missing" must define MergeBeforeUpdate`,
+		},
+		{
+			name: "HarmonizeImmutableFields",
+			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+				Type:                     &resources.TestResource{},
+				MergeBeforeUpdate:        func(current, desired *resources.TestResource) {},
+				HarmonizeImmutableFields: func(current, desired *resources.TestResource) {},
+			},
+		},
+		{
+			name: "Sanitize",
+			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+				Type:              &resources.TestResource{},
+				MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
+				Sanitize:          func(child *resources.TestResource) interface{} { return child.Spec },
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			}
+		})
+	}
 }
 
 func TestPatch(t *testing.T) {

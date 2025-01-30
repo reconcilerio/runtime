@@ -193,7 +193,7 @@ func (r *ChildSetReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, m
 		WithValues("childType", gvk(c, r.ChildType))
 	ctx = logr.NewContext(ctx, log)
 
-	if err := r.validate(ctx); err != nil {
+	if err := r.Validate(ctx); err != nil {
 		return err
 	}
 
@@ -244,7 +244,7 @@ func (r *ChildSetReconciler[T, CT, CLT]) childReconcilerFor(desired CT, desiredE
 	}
 }
 
-func (r *ChildSetReconciler[T, CT, CLT]) validate(ctx context.Context) error {
+func (r *ChildSetReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
 	// default implicit values
 	if r.Finalizer != "" {
 		r.SkipOwnerReference = true

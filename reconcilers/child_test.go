@@ -367,6 +367,11 @@ func TestChildReconciler(t *testing.T) {
 					r := defaultChildReconciler(c)
 					r.SkipOwnerReference = true
 					r.OurChild = func(parent *resources.TestResource, child *corev1.ConfigMap) bool { return true }
+					r.ListOptions = func(ctx context.Context, resource *resources.TestResource) []client.ListOption {
+						return []client.ListOption{
+							client.InNamespace(testNamespace),
+						}
+					}
 					return r
 				},
 			},
@@ -1153,4 +1158,182 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*unstructured.Unstructured], c reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured] {
 		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*unstructured.Unstructured])(t, c)
 	})
+}
+
+func TestChildReconciler_Validate(t *testing.T) {
+	tests := []struct {
+		name       string
+		parent     *corev1.ConfigMap
+		reconciler *reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]
+		shouldErr  string
+	}{
+		{
+			name:       "empty",
+			parent:     &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{},
+			shouldErr:  `ChildReconciler "" must implement DesiredChild`,
+		},
+		{
+			name:   "valid",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+			},
+		},
+		{
+			name:   "ChildType missing",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				Name: "ChildType missing",
+				// ChildType:                  &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+			},
+		},
+		{
+			name:   "ChildListType missing",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				Name:      "ChildListType missing",
+				ChildType: &corev1.Pod{},
+				// ChildListType:              &corev1.PodList{},
+				DesiredChild: func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+			},
+		},
+		{
+			name:   "DesiredChild missing",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				Name:          "DesiredChild missing",
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				// DesiredChild:               func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+			},
+			shouldErr: `ChildReconciler "DesiredChild missing" must implement DesiredChild`,
+		},
+		{
+			name:   "ReflectChildStatusOnParent missing",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				Name:          "ReflectChildStatusOnParent missing",
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				// ReflectChildStatusOnParent: func(parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+			},
+			shouldErr: `ChildReconciler "ReflectChildStatusOnParent missing" must implement ReflectChildStatusOnParent`,
+		},
+		{
+			name:   "ListOptions",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+				ListOptions:                func(ctx context.Context, parent *corev1.ConfigMap) []client.ListOption { return []client.ListOption{} },
+			},
+		},
+		{
+			name:   "ListOptions missing",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				Name:          "ListOptions missing",
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+				SkipOwnerReference:         true,
+				// ListOptions:                func(ctx context.Context, parent *corev1.ConfigMap) []client.ListOption { return []client.ListOption{} },
+				OurChild: func(resource *corev1.ConfigMap, child *corev1.Pod) bool { return true },
+			},
+			shouldErr: `ChildReconciler "ListOptions missing" must implement ListOptions since owner references are not used`,
+		},
+		{
+			name:   "SkipOwnerReference without OurChild",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				Name:          "SkipOwnerReference without OurChild",
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+				SkipOwnerReference:         true,
+			},
+			shouldErr: `ChildReconciler "SkipOwnerReference without OurChild" must implement OurChild since owner references are not used`,
+		},
+		{
+			name:   "OurChild",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+				OurChild:                   func(parent *corev1.ConfigMap, child *corev1.Pod) bool { return false },
+			},
+		},
+		{
+			name:   "ChildObjectManager missing",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				Name:          "ChildObjectManager missing",
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				// ChildObjectManager: &UpdatingObjectManager[*corev1.Pod]{
+				// 	MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				// },
+				ReflectChildStatusOnParent: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
+			},
+			shouldErr: `ChildReconciler "ChildObjectManager missing" must implement ChildObjectManager`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := reconcilers.StashResourceType(context.TODO(), c.parent)
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				var errString string
+				if err != nil {
+					errString = err.Error()
+				}
+				t.Errorf("validate() error = %q, shouldErr %q", errString, c.shouldErr)
+			}
+		})
+	}
 }

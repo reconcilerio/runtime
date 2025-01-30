@@ -85,7 +85,7 @@ func (r *CastResource[T, CT]) SetupWithManager(ctx context.Context, mgr ctrl.Man
 			WithValues("castResourceType", typeName(emptyCT))
 		ctx = logr.NewContext(ctx, log)
 
-		if err := r.validate(ctx); err != nil {
+		if err := r.Validate(ctx); err != nil {
 			return err
 		}
 	}
@@ -93,7 +93,7 @@ func (r *CastResource[T, CT]) SetupWithManager(ctx context.Context, mgr ctrl.Man
 	return r.Reconciler.SetupWithManager(ctx, mgr, bldr)
 }
 
-func (r *CastResource[T, CT]) validate(ctx context.Context) error {
+func (r *CastResource[T, CT]) Validate(ctx context.Context) error {
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("CastResource %q must define Reconciler", r.Name)

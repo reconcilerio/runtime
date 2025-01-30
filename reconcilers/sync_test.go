@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
@@ -30,6 +31,7 @@ import (
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -93,17 +95,6 @@ func TestSyncReconciler(t *testing.T) {
 				},
 			},
 			ShouldErr: true,
-		},
-		"missing sync method": {
-			Resource: resource.DieReleasePtr(),
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return &reconcilers.SyncReconciler[*resources.TestResource]{
-						Sync: nil,
-					}
-				},
-			},
-			ShouldPanic: true,
 		},
 		"should not finalize non-deleted resources": {
 			Resource: resource.DieReleasePtr(),
@@ -342,4 +333,110 @@ func TestSyncReconcilerDuck(t *testing.T) {
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*resources.TestDuck], c reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck] {
 		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck])(t, c)
 	})
+}
+
+func TestSyncReconciler_Validate(t *testing.T) {
+	tests := []struct {
+		name       string
+		resource   client.Object
+		reconciler *reconcilers.SyncReconciler[*corev1.ConfigMap]
+		shouldErr  string
+	}{
+		{
+			name:       "empty",
+			resource:   &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
+			shouldErr:  `SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
+		{
+			name:     "valid",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+				Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+			},
+		},
+		{
+			name:     "valid SyncWithResult",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+				SyncWithResult: func(ctx context.Context, resource *corev1.ConfigMap) (reconcilers.Result, error) {
+					return reconcilers.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "valid",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+				Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+			},
+		},
+		{
+			name:     "invalid Sync and SyncWithResult",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+				Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+				SyncWithResult: func(ctx context.Context, resource *corev1.ConfigMap) (reconcilers.Result, error) {
+					return reconcilers.Result{}, nil
+				},
+			},
+			shouldErr: `SyncReconciler "" may not implement both Sync and SyncWithResult`,
+		},
+		{
+			name:     "valid Finalize",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+				Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+				Finalize: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+			},
+		},
+		{
+			name:     "valid Finalize with result",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+				Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+				FinalizeWithResult: func(ctx context.Context, resource *corev1.ConfigMap) (reconcilers.Result, error) {
+					return reconcilers.Result{}, nil
+				},
+			},
+		},
+		{
+			name:     "invalid Finalize and FinalizeWithResult",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+				Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+				Finalize: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					return nil
+				},
+				FinalizeWithResult: func(ctx context.Context, resource *corev1.ConfigMap) (reconcilers.Result, error) {
+					return reconcilers.Result{}, nil
+				},
+			},
+			shouldErr: `SyncReconciler "" may not implement both Finalize and FinalizeWithResult`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := reconcilers.StashResourceType(context.TODO(), c.resource)
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+		})
+	}
 }

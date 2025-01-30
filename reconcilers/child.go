@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/trace"
 )
 
 var (
@@ -238,6 +239,9 @@ func (r *ChildReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource T)
 		WithName(r.Name).
 		WithValues("childType", gvk(c, r.ChildType))
 	ctx = logr.NewContext(ctx, log)
+
+	trace.Enter(ctx, r.Name)
+	defer trace.Exit(ctx)
 
 	child, err := r.reconcile(ctx, resource)
 	if resource.GetDeletionTimestamp() != nil {

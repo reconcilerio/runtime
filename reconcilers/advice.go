@@ -27,9 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	_ SubReconciler[client.Object] = (*Advice[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*Advice[client.Object])(nil)
 
 // Advice is a sub reconciler for advising the lifecycle of another sub reconciler in an aspect
 // oriented programming style.
@@ -125,6 +123,14 @@ func (r *Advice[T]) Validate(ctx context.Context) error {
 	}
 	if r.Before == nil && r.Around == nil && r.After == nil {
 		return fmt.Errorf("Advice %q must implement at least one of Before, Around or After", r.Name)
+	}
+
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("Advice %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil

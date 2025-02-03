@@ -26,9 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	_ SubReconciler[client.Object] = (Sequence[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (Sequence[client.Object])(nil)
 
 // Sequence is a collection of SubReconcilers called in order. If a
 // reconciler errs, further reconcilers are skipped.
@@ -63,4 +61,19 @@ func (r Sequence[T]) Reconcile(ctx context.Context, resource T) (Result, error) 
 	}
 
 	return aggregateResult, nil
+}
+
+func (r *Sequence[T]) Validate(ctx context.Context) error {
+	// validate Sequence
+	if hasNestedValidation(ctx) {
+		for i, reconciler := range *r {
+			if v, ok := reconciler.(Validator); ok {
+				if err := v.Validate(ctx); err != nil {
+					return fmt.Errorf("Sequence must have a valid Sequence[%d]: %s", i, err)
+				}
+			}
+		}
+	}
+
+	return nil
 }

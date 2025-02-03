@@ -296,3 +296,57 @@ func TestSequence(t *testing.T) {
 		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c)
 	})
 }
+
+func TestSequence_Validate(t *testing.T) {
+	tests := []struct {
+		name       string
+		reconciler *reconcilers.Sequence[*resources.TestResource]
+		shouldErr  string
+	}{
+		{
+			name:       "valid empty sequence",
+			reconciler: &reconcilers.Sequence[*resources.TestResource]{},
+		},
+		{
+			name: "valid sequence",
+			reconciler: &reconcilers.Sequence[*resources.TestResource]{
+				&reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+				&reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+		},
+		{
+			name: "invalid sequence",
+			reconciler: &reconcilers.Sequence[*resources.TestResource]{
+				&reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+				&reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			shouldErr: `Sequence must have a valid Sequence[1]: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := reconcilers.WithNestedValidation(context.TODO())
+			err := c.reconciler.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+		})
+	}
+}

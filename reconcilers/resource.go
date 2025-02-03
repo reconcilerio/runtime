@@ -180,6 +180,13 @@ func (r *ResourceReconciler[T]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("ResourceReconciler %q must define Reconciler", r.Name)
 	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("ResourceReconciler %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
+	}
 
 	// warn users of common pitfalls. These are not blockers.
 

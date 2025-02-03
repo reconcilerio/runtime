@@ -1729,10 +1729,11 @@ func TestResourceReconciler_LegacyDefault(t *testing.T) {
 
 func TestResourceReconciler_Validate_TestResource(t *testing.T) {
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.ResourceReconciler[*resources.TestResource]
-		shouldErr    string
-		expectedLogs []string
+		name           string
+		reconciler     *reconcilers.ResourceReconciler[*resources.TestResource]
+		validateNested bool
+		shouldErr      string
+		expectedLogs   []string
 	}{
 		{
 			name: "valid",
@@ -1755,12 +1756,38 @@ func TestResourceReconciler_Validate_TestResource(t *testing.T) {
 			},
 			shouldErr: `ResourceReconciler "missing reconciler" must define Reconciler`,
 		},
+		{
+			name: "valid reconciler",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResource]{
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid reconciler",
+			reconciler: &reconcilers.ResourceReconciler[*resources.TestResource]{
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `ResourceReconciler "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

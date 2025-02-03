@@ -78,14 +78,21 @@ func (r *IfThen[T]) init() {
 }
 
 func (r *IfThen[T]) Validate(ctx context.Context) error {
-	// require If
+	// validate If
 	if r.If == nil {
 		return fmt.Errorf("IfThen %q must implement If", r.Name)
 	}
 
-	// require Then
+	// validate Then
 	if r.Then == nil {
 		return fmt.Errorf("IfThen %q must implement Then", r.Name)
+	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Then.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("IfThen %q must have a valid Then: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -214,14 +221,21 @@ func (r *While[T]) init() {
 }
 
 func (r *While[T]) Validate(ctx context.Context) error {
-	// require If
+	// validate Condition
 	if r.Condition == nil {
 		return fmt.Errorf("While %q must implement Condition", r.Name)
 	}
 
-	// require Reconciler
+	// validate Reconciler
 	if r.Reconciler == nil {
 		return fmt.Errorf("While %q must implement Reconciler", r.Name)
+	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("While %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -333,6 +347,13 @@ func (r *ForEach[T, I]) Validate(ctx context.Context) error {
 	}
 	if r.Items == nil {
 		return fmt.Errorf("ForEach %q must implement Items", r.Name)
+	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("ForEach %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -451,9 +472,25 @@ func (r *TryCatch[T]) init() {
 }
 
 func (r *TryCatch[T]) Validate(ctx context.Context) error {
-	// require Try
+	// validate Try
 	if r.Try == nil {
 		return fmt.Errorf("TryCatch %q must implement Try", r.Name)
+	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Try.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("TryCatch %q must have a valid Try: %s", r.Name, err)
+			}
+		}
+	}
+
+	// validate Finally
+	if r.Finally != nil && hasNestedValidation(ctx) {
+		if v, ok := r.Finally.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("TryCatch %q must have a valid Finally: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -547,8 +584,18 @@ func (r *OverrideSetup[T]) init() {
 }
 
 func (r *OverrideSetup[T]) Validate(ctx context.Context) error {
+	// validate Setup || Reconciler
 	if r.Setup == nil && r.Reconciler == nil {
 		return fmt.Errorf("OverrideSetup %q must implement at least one of Setup or Reconciler", r.Name)
+	}
+
+	// validate Reconciler
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("OverrideSetup %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil

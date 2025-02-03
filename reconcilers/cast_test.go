@@ -244,10 +244,11 @@ func TestCastResource(t *testing.T) {
 
 func TestCastResource_Validate(t *testing.T) {
 	tests := []struct {
-		name       string
-		resource   client.Object
-		reconciler *reconcilers.CastResource[*corev1.ConfigMap, *corev1.Secret]
-		shouldErr  string
+		name           string
+		resource       client.Object
+		reconciler     *reconcilers.CastResource[*corev1.ConfigMap, *corev1.Secret]
+		validateNested bool
+		shouldErr      string
 	}{
 		{
 			name:       "empty",
@@ -275,11 +276,39 @@ func TestCastResource_Validate(t *testing.T) {
 			},
 			shouldErr: `CastResource "missing reconciler" must define Reconciler`,
 		},
+		{
+			name:     "valid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.CastResource[*corev1.ConfigMap, *corev1.Secret]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.Secret]{
+					Sync: func(ctx context.Context, resource *corev1.Secret) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name:     "invalid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.CastResource[*corev1.ConfigMap, *corev1.Secret]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.Secret]{
+					// Sync: func(ctx context.Context, resource *corev1.Secret) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `CastResource "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := reconcilers.StashResourceType(context.TODO(), c.resource)
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

@@ -32,9 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	_ SubReconciler[client.Object] = (*CastResource[client.Object, client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*CastResource[client.Object, client.Object])(nil)
 
 // CastResource casts the ResourceReconciler's type by projecting the resource data
 // onto a new struct. Casting the reconciled resource is useful to create cross
@@ -97,6 +95,13 @@ func (r *CastResource[T, CT]) Validate(ctx context.Context) error {
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("CastResource %q must define Reconciler", r.Name)
+	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("CastResource %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil

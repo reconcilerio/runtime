@@ -232,10 +232,11 @@ func TestAdvice(t *testing.T) {
 
 func TestAdvice_Validate(t *testing.T) {
 	tests := []struct {
-		name       string
-		resource   client.Object
-		reconciler *reconcilers.Advice[*corev1.ConfigMap]
-		shouldErr  string
+		name           string
+		resource       client.Object
+		reconciler     *reconcilers.Advice[*corev1.ConfigMap]
+		validateNested bool
+		shouldErr      string
 	}{
 		{
 			name:       "empty",
@@ -297,11 +298,45 @@ func TestAdvice_Validate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "valid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+					Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+						return nil
+					},
+				},
+				After: func(ctx context.Context, resource *corev1.ConfigMap, result reconcile.Result, err error) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name:     "invalid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+					// Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					// 	return nil
+					// },
+				},
+				After: func(ctx context.Context, resource *corev1.ConfigMap, result reconcile.Result, err error) (reconcile.Result, error) {
+					return reconcile.Result{}, nil
+				},
+			},
+			validateNested: true,
+			shouldErr:      `Advice "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := reconcilers.StashResourceType(context.TODO(), c.resource)
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

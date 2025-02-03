@@ -30,9 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var (
-	_ SubReconciler[client.Object] = (*WithFinalizer[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*WithFinalizer[client.Object])(nil)
 
 // WithFinalizer ensures the resource being reconciled has the desired finalizer set so that state
 // can be cleaned up upon the resource being deleted. The finalizer is added to the resource, if not
@@ -105,6 +103,13 @@ func (r *WithFinalizer[T]) Validate(ctx context.Context) error {
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("WithFinalizer %q must define Reconciler", r.Name)
+	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("WithFinalizer %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
 	}
 
 	return nil

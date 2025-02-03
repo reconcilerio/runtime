@@ -174,6 +174,13 @@ func (r *WithConfig[T]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("WithConfig %q must define Reconciler", r.Name)
 	}
+	if hasNestedValidation(ctx) {
+		if v, ok := r.Reconciler.(Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("WithConfig %q must have a valid Reconciler: %s", r.Name, err)
+			}
+		}
+	}
 
 	return nil
 }

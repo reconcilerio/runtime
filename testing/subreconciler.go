@@ -228,7 +228,8 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	c := expectConfig.Config()
 
 	r := factory(t, tc, c)
-	if v, ok := r.(Validator); ok {
+	ctx = reconcilers.WithNestedValidation(ctx)
+	if v, ok := r.(reconcilers.Validator); ok {
 		if err := v.Validate(ctx); err != nil {
 			t.Fatalf("subreconciler validation failed: %s", err)
 		}

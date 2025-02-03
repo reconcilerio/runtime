@@ -156,10 +156,11 @@ func TestIfThen(t *testing.T) {
 
 func TestIfThen_Validate(t *testing.T) {
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.IfThen[*resources.TestResource]
-		shouldErr    string
-		expectedLogs []string
+		name           string
+		reconciler     *reconcilers.IfThen[*resources.TestResource]
+		validateNested bool
+		shouldErr      string
+		expectedLogs   []string
 	}{
 		{
 			name: "valid",
@@ -198,12 +199,44 @@ func TestIfThen_Validate(t *testing.T) {
 				Else: reconcilers.Sequence[*resources.TestResource]{},
 			},
 		},
+		{
+			name: "valid then",
+			reconciler: &reconcilers.IfThen[*resources.TestResource]{
+				If: func(ctx context.Context, resource *resources.TestResource) bool {
+					return false
+				},
+				Then: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid then",
+			reconciler: &reconcilers.IfThen[*resources.TestResource]{
+				If: func(ctx context.Context, resource *resources.TestResource) bool {
+					return false
+				},
+				Then: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `IfThen "" must have a valid Then: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
@@ -336,10 +369,11 @@ func TestWhile(t *testing.T) {
 
 func TestWhile_Validate(t *testing.T) {
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.While[*resources.TestResource]
-		shouldErr    string
-		expectedLogs []string
+		name           string
+		reconciler     *reconcilers.While[*resources.TestResource]
+		shouldErr      string
+		validateNested bool
+		expectedLogs   []string
 	}{
 		{
 			name: "valid",
@@ -368,12 +402,44 @@ func TestWhile_Validate(t *testing.T) {
 			},
 			shouldErr: `While "missing reconciler" must implement Reconciler`,
 		},
+		{
+			name: "valid reconciler",
+			reconciler: &reconcilers.While[*resources.TestResource]{
+				Condition: func(ctx context.Context, resource *resources.TestResource) bool {
+					return false
+				},
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid reconciler",
+			reconciler: &reconcilers.While[*resources.TestResource]{
+				Condition: func(ctx context.Context, resource *resources.TestResource) bool {
+					return false
+				},
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `While "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
@@ -513,10 +579,11 @@ func TestForEach(t *testing.T) {
 
 func TestForEach_Validate(t *testing.T) {
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.ForEach[*resources.TestResource, any]
-		shouldErr    string
-		expectedLogs []string
+		name           string
+		reconciler     *reconcilers.ForEach[*resources.TestResource, any]
+		validateNested bool
+		shouldErr      string
+		expectedLogs   []string
 	}{
 		{
 			name: "valid",
@@ -547,12 +614,44 @@ func TestForEach_Validate(t *testing.T) {
 			},
 			shouldErr: `ForEach "missing reconciler" must implement Reconciler`,
 		},
+		{
+			name: "valid reconciler",
+			reconciler: &reconcilers.ForEach[*resources.TestResource, any]{
+				Items: func(ctx context.Context, resource *resources.TestResource) ([]any, error) {
+					return nil, nil
+				},
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid reconciler",
+			reconciler: &reconcilers.ForEach[*resources.TestResource, any]{
+				Items: func(ctx context.Context, resource *resources.TestResource) ([]any, error) {
+					return nil, nil
+				},
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `ForEach "invalid reconciler" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			r := c.reconciler
 			r.Name = c.name
 			err := r.Validate(ctx)
@@ -763,10 +862,11 @@ func TestTryCatch(t *testing.T) {
 
 func TestTryCatch_Validate(t *testing.T) {
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.TryCatch[*resources.TestResource]
-		shouldErr    string
-		expectedLogs []string
+		name           string
+		reconciler     *reconcilers.TryCatch[*resources.TestResource]
+		validateNested bool
+		shouldErr      string
+		expectedLogs   []string
 	}{
 		{
 			name: "valid",
@@ -807,12 +907,71 @@ func TestTryCatch_Validate(t *testing.T) {
 			},
 			shouldErr: `TryCatch "missing try" must implement Try`,
 		},
+		{
+			name: "valid try",
+			reconciler: &reconcilers.TryCatch[*resources.TestResource]{
+				Try: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid try",
+			reconciler: &reconcilers.TryCatch[*resources.TestResource]{
+				Try: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `TryCatch "" must have a valid Try: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
+		{
+			name: "valid finally",
+			reconciler: &reconcilers.TryCatch[*resources.TestResource]{
+				Try: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+				Finally: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid finally",
+			reconciler: &reconcilers.TryCatch[*resources.TestResource]{
+				Try: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+				Finally: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `TryCatch "" must have a valid Finally: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
@@ -869,10 +1028,11 @@ func TestOverrideSetup(t *testing.T) {
 
 func TestOverrideSetup_Validate(t *testing.T) {
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.OverrideSetup[*resources.TestResource]
-		shouldErr    string
-		expectedLogs []string
+		name           string
+		reconciler     *reconcilers.OverrideSetup[*resources.TestResource]
+		validateNested bool
+		shouldErr      string
+		expectedLogs   []string
 	}{
 		{
 			name: "with reconciler",
@@ -904,12 +1064,38 @@ func TestOverrideSetup_Validate(t *testing.T) {
 			},
 			shouldErr: `OverrideSetup "missing reconciler or setup" must implement at least one of Setup or Reconciler`,
 		},
+		{
+			name: "valid reconciler",
+			reconciler: &reconcilers.OverrideSetup[*resources.TestResource]{
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid reconciler",
+			reconciler: &reconcilers.OverrideSetup[*resources.TestResource]{
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr: `OverrideSetup "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			if c.validateNested {
+				ctx = reconcilers.WithNestedValidation(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

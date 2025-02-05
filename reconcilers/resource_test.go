@@ -1024,6 +1024,64 @@ func TestResourceReconciler(t *testing.T) {
 				}),
 			},
 		},
+		"status does not update for deleted resource": {
+			Request: testRequest,
+			GivenObjects: []client.Object{
+				givenResource.MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.DeletionTimestamp(&deletedAt)
+					d.Finalizers(testFinalizer)
+				}),
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							if resource.Status.Fields == nil {
+								resource.Status.Fields = map[string]string{}
+							}
+							resource.Status.Fields["Reconciler"] = "ran"
+							return nil
+						},
+					}
+				},
+			},
+		},
+		"status updates for deleting resource when allowed": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			GivenObjects: []client.Object{
+				givenResource.MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.DeletionTimestamp(&deletedAt)
+					d.Finalizers(testFinalizer)
+				}),
+			},
+			Metadata: map[string]interface{}{
+				"SyncStatusDuringFinalization": true,
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						SyncDuringFinalization: true,
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							if resource.Status.Fields == nil {
+								resource.Status.Fields = map[string]string{}
+							}
+							resource.Status.Fields["Reconciler"] = "ran"
+							return nil
+						},
+					}
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+					`Updated status`),
+			},
+			ExpectStatusUpdates: []client.Object{
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.AddField("Reconciler", "ran")
+				}),
+			},
+		},
 		"skip status updates": {
 			Request: testRequest,
 			GivenObjects: []client.Object{
@@ -1433,6 +1491,10 @@ func TestResourceReconciler(t *testing.T) {
 		if skip, ok := rtc.Metadata["SkipStatusUpdate"].(bool); ok {
 			skipStatusUpdate = skip
 		}
+		syncStatusDuringFinalization := false
+		if allow, ok := rtc.Metadata["SyncStatusDuringFinalization"].(bool); ok {
+			syncStatusDuringFinalization = allow
+		}
 		var beforeReconcile func(context.Context, reconcilers.Request) (context.Context, reconcilers.Result, error)
 		if before, ok := rtc.Metadata["BeforeReconcile"].(func(context.Context, reconcilers.Request) (context.Context, reconcilers.Result, error)); ok {
 			beforeReconcile = before
@@ -1442,11 +1504,12 @@ func TestResourceReconciler(t *testing.T) {
 			afterReconcile = after
 		}
 		return &reconcilers.ResourceReconciler[*resources.TestResource]{
-			Reconciler:       rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c),
-			SkipStatusUpdate: skipStatusUpdate,
-			BeforeReconcile:  beforeReconcile,
-			AfterReconcile:   afterReconcile,
-			Config:           c,
+			Reconciler:                   rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c),
+			SkipStatusUpdate:             skipStatusUpdate,
+			SyncStatusDuringFinalization: syncStatusDuringFinalization,
+			BeforeReconcile:              beforeReconcile,
+			AfterReconcile:               afterReconcile,
+			Config:                       c,
 		}
 	})
 }

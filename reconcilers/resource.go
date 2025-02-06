@@ -74,6 +74,10 @@ type ResourceReconciler[Type client.Object] struct {
 	// conflicts. Finalizers and events are still actionable.
 	SkipStatusUpdate bool
 
+	// SyncStatusDuringFinalization when true, the resource's status will be updated even
+	// when the resource is marked for deletion.
+	SyncStatusDuringFinalization bool
+
 	// Reconciler is called for each reconciler request with the resource being reconciled.
 	// Typically, Reconciler is a Sequence of multiple SubReconcilers.
 	//
@@ -289,7 +293,7 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 
 	// check if status has changed before updating
 	resourceStatus, originalResourceStatus := r.status(resource), r.status(originalResource)
-	if !equality.Semantic.DeepEqual(resourceStatus, originalResourceStatus) && resource.GetDeletionTimestamp() == nil {
+	if !equality.Semantic.DeepEqual(resourceStatus, originalResourceStatus) && (resource.GetDeletionTimestamp() == nil || r.SyncStatusDuringFinalization) {
 		if duck.IsDuck(resource, c.Scheme()) {
 			// patch status
 			log.Info("patching status", "diff", cmp.Diff(originalResourceStatus, resourceStatus, IgnoreAllUnexported))

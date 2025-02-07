@@ -26,7 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	diecorev1 "reconciler.io/dies/apis/core/v1"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/internal/resources"
@@ -327,7 +327,7 @@ func TestWhile(t *testing.T) {
 			},
 		}
 		if i, ok := rtc.Metadata["MaxIterations"]; ok {
-			r.MaxIterations = pointer.Int(i.(int))
+			r.MaxIterations = ptr.To(i.(int))
 		}
 
 		return r

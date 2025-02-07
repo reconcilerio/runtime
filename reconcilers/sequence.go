@@ -70,7 +70,7 @@ func (r *Sequence[T]) Validate(ctx context.Context) error {
 		for i, reconciler := range *r {
 			if v, ok := reconciler.(validation.Validator); ok {
 				if err := v.Validate(ctx); err != nil {
-					return fmt.Errorf("Sequence must have a valid Sequence[%d]: %s", i, err)
+					return fmt.Errorf("Sequence must have a valid Sequence[%d]: %w", i, err)
 				}
 			}
 		}

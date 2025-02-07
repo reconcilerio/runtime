@@ -178,7 +178,7 @@ func (r *WithConfig[T]) Validate(ctx context.Context) error {
 	if validation.IsRecursive(ctx) {
 		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
-				return fmt.Errorf("WithConfig %q must have a valid Reconciler: %s", r.Name, err)
+				return fmt.Errorf("WithConfig %q must have a valid Reconciler: %w", r.Name, err)
 			}
 		}
 	}

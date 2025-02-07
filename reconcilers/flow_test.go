@@ -33,6 +33,7 @@ import (
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -235,7 +236,7 @@ func TestIfThen_Validate(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
@@ -438,7 +439,7 @@ func TestWhile_Validate(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
@@ -650,7 +651,7 @@ func TestForEach_Validate(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			r := c.reconciler
 			r.Name = c.name
@@ -970,7 +971,7 @@ func TestTryCatch_Validate(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
@@ -1094,7 +1095,7 @@ func TestOverrideSetup_Validate(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {

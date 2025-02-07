@@ -29,6 +29,7 @@ import (
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/validation"
 	rtesting "reconciler.io/runtime/testing"
 )
 
@@ -342,7 +343,7 @@ func TestSequence_Validate(t *testing.T) {
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
-			ctx := reconcilers.WithNestedValidation(context.TODO())
+			ctx := validation.WithRecursive(context.TODO())
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

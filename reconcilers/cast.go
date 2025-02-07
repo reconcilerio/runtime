@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/errors"
+	"reconciler.io/runtime/validation"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -96,8 +97,8 @@ func (r *CastResource[T, CT]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("CastResource %q must define Reconciler", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("CastResource %q must have a valid Reconciler: %s", r.Name, err)
 			}

@@ -35,6 +35,7 @@ import (
 	"github.com/go-logr/logr"
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/tracker"
+	"reconciler.io/runtime/validation"
 )
 
 // Config holds common resources for controllers. The configuration may be
@@ -174,8 +175,8 @@ func (r *WithConfig[T]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("WithConfig %q must define Reconciler", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("WithConfig %q must have a valid Reconciler: %s", r.Name, err)
 			}

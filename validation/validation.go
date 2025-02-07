@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,24 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package reconcilers
+package validation
 
-import (
-	"context"
-	"testing"
-)
+import "context"
 
-func TestNestedValidation(t *testing.T) {
-	t.Run("no nested validation", func(t *testing.T) {
-		ctx := context.Background()
-		if hasNestedValidation(ctx) {
-			t.Errorf("expected %v not to have nested validation", ctx)
-		}
-	})
-	t.Run("has nested validation", func(t *testing.T) {
-		ctx := WithNestedValidation(context.Background())
-		if !hasNestedValidation(ctx) {
-			t.Errorf("expected %v to have nested validation", ctx)
-		}
-	})
+type Validator interface {
+	Validate(ctx context.Context) error
+}
+
+type recursiveKey struct{}
+
+func WithRecursive(ctx context.Context) context.Context {
+	return context.WithValue(ctx, recursiveKey{}, struct{}{})
+}
+
+func IsRecursive(ctx context.Context) bool {
+	return ctx.Value(recursiveKey{}) != nil
 }

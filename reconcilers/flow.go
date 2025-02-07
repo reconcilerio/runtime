@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/utils/ptr"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,8 +88,8 @@ func (r *IfThen[T]) Validate(ctx context.Context) error {
 	if r.Then == nil {
 		return fmt.Errorf("IfThen %q must implement Then", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Then.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Then.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("IfThen %q must have a valid Then: %s", r.Name, err)
 			}
@@ -230,8 +231,8 @@ func (r *While[T]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("While %q must implement Reconciler", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("While %q must have a valid Reconciler: %s", r.Name, err)
 			}
@@ -348,8 +349,8 @@ func (r *ForEach[T, I]) Validate(ctx context.Context) error {
 	if r.Items == nil {
 		return fmt.Errorf("ForEach %q must implement Items", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("ForEach %q must have a valid Reconciler: %s", r.Name, err)
 			}
@@ -476,8 +477,8 @@ func (r *TryCatch[T]) Validate(ctx context.Context) error {
 	if r.Try == nil {
 		return fmt.Errorf("TryCatch %q must implement Try", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Try.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Try.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("TryCatch %q must have a valid Try: %s", r.Name, err)
 			}
@@ -485,8 +486,8 @@ func (r *TryCatch[T]) Validate(ctx context.Context) error {
 	}
 
 	// validate Finally
-	if r.Finally != nil && hasNestedValidation(ctx) {
-		if v, ok := r.Finally.(Validator); ok {
+	if r.Finally != nil && validation.IsRecursive(ctx) {
+		if v, ok := r.Finally.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("TryCatch %q must have a valid Finally: %s", r.Name, err)
 			}
@@ -590,8 +591,8 @@ func (r *OverrideSetup[T]) Validate(ctx context.Context) error {
 	}
 
 	// validate Reconciler
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("OverrideSetup %q must have a valid Reconciler: %s", r.Name, err)
 			}

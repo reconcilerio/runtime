@@ -33,6 +33,7 @@ import (
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -307,7 +308,7 @@ func TestCastResource_Validate(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := reconcilers.StashResourceType(context.TODO(), c.resource)
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {

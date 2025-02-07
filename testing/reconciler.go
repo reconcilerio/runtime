@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/reconcilers"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -208,8 +209,8 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	ctx = reconcilers.StashAdditionalConfigs(ctx, configs)
 
 	r := factory(t, tc, expectConfig.Config())
-	ctx = reconcilers.WithNestedValidation(ctx)
-	if v, ok := r.(reconcilers.Validator); ok {
+	ctx = validation.WithRecursive(ctx)
+	if v, ok := r.(validation.Validator); ok {
 		if err := v.Validate(ctx); err != nil {
 			t.Fatalf("reconciler validation failed: %s", err)
 		}

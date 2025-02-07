@@ -34,6 +34,7 @@ import (
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
 	"reconciler.io/runtime/tracker"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -417,7 +418,7 @@ func TestWithConfig_Validate(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := context.TODO()
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {

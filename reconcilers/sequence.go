@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -65,9 +66,9 @@ func (r Sequence[T]) Reconcile(ctx context.Context, resource T) (Result, error) 
 
 func (r *Sequence[T]) Validate(ctx context.Context) error {
 	// validate Sequence
-	if hasNestedValidation(ctx) {
+	if validation.IsRecursive(ctx) {
 		for i, reconciler := range *r {
-			if v, ok := reconciler.(Validator); ok {
+			if v, ok := reconciler.(validation.Validator); ok {
 				if err := v.Validate(ctx); err != nil {
 					return fmt.Errorf("Sequence must have a valid Sequence[%d]: %s", i, err)
 				}

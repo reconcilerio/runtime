@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -125,8 +126,8 @@ func (r *Advice[T]) Validate(ctx context.Context) error {
 		return fmt.Errorf("Advice %q must implement at least one of Before, Around or After", r.Name)
 	}
 
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("Advice %q must have a valid Reconciler: %s", r.Name, err)
 			}

@@ -36,6 +36,7 @@ import (
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -659,7 +660,7 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
 			if c.validateNested {
-				ctx = reconcilers.WithNestedValidation(ctx)
+				ctx = validation.WithRecursive(ctx)
 			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {

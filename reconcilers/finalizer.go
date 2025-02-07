@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -104,8 +105,8 @@ func (r *WithFinalizer[T]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("WithFinalizer %q must define Reconciler", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("WithFinalizer %q must have a valid Reconciler: %s", r.Name, err)
 			}

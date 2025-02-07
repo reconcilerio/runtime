@@ -41,6 +41,7 @@ import (
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 )
 
 var _ reconcile.Reconciler = (*ResourceReconciler[client.Object])(nil)
@@ -180,8 +181,8 @@ func (r *ResourceReconciler[T]) Validate(ctx context.Context) error {
 	if r.Reconciler == nil {
 		return fmt.Errorf("ResourceReconciler %q must define Reconciler", r.Name)
 	}
-	if hasNestedValidation(ctx) {
-		if v, ok := r.Reconciler.(Validator); ok {
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
 			if err := v.Validate(ctx); err != nil {
 				return fmt.Errorf("ResourceReconciler %q must have a valid Reconciler: %s", r.Name, err)
 			}

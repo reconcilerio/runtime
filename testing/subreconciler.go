@@ -56,9 +56,10 @@ type SubReconcilerTestCase[Type client.Object] struct {
 	GivenStashedValues map[reconcilers.StashKey]interface{}
 	// WithClientBuilder allows a test to modify the fake client initialization.
 	WithClientBuilder func(*fake.ClientBuilder) *fake.ClientBuilder
-	// WithReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
+	// WithReactors and WithWatchReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
 	// each call to the clientset providing the ability to mutate the resource or inject an error.
-	WithReactors []ReactionFunc
+	WithReactors      []ReactionFunc
+	WithWatchReactors []WatchReactionFunc
 	// StatusSubResourceTypes is a set of object types that support the status sub-resource. For
 	// these types, the only way to modify the resource's status is update or patch the status
 	// sub-resource. Patching or updating the main resource will not mutated the status field.
@@ -216,6 +217,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		APIGivenObjects:         append(tc.APIGivenObjects, givenResource),
 		WithClientBuilder:       tc.WithClientBuilder,
 		WithReactors:            tc.WithReactors,
+		WithWatchReactors:       tc.WithWatchReactors,
 		GivenTracks:             tc.GivenTracks,
 		ExpectTracks:            tc.ExpectTracks,
 		ExpectEvents:            tc.ExpectEvents,

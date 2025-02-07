@@ -80,7 +80,7 @@ func TestChildReconciler(t *testing.T) {
 		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 		})
 
-	defaultChildReconciler := func(c reconcilers.Config) *reconcilers.ChildReconciler[*resources.TestResource, *corev1.ConfigMap, *corev1.ConfigMapList] {
+	defaultChildReconciler := func(_ reconcilers.Config) *reconcilers.ChildReconciler[*resources.TestResource, *corev1.ConfigMap, *corev1.ConfigMapList] {
 		return &reconcilers.ChildReconciler[*resources.TestResource, *corev1.ConfigMap, *corev1.ConfigMapList]{
 			DesiredChild: func(ctx context.Context, parent *resources.TestResource) (*corev1.ConfigMap, error) {
 				if len(parent.Spec.Fields) == 0 {
@@ -695,7 +695,7 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 		})
 
-	defaultChildReconciler := func(c reconcilers.Config) *reconcilers.ChildReconciler[*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.UnstructuredList] {
+	defaultChildReconciler := func(_ reconcilers.Config) *reconcilers.ChildReconciler[*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.UnstructuredList] {
 		return &reconcilers.ChildReconciler[*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.UnstructuredList]{
 			ChildType: &unstructured.Unstructured{
 				Object: map[string]interface{}{

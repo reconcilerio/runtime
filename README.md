@@ -741,7 +741,7 @@ func AdmissionProjectorWebhook(c reconcilers.Config) *reconcilers.AdmissionWebho
 	}
 }
 ```
-[full source](https://github.com/scothis/servicebinding-runtime/blob/8ae0b1fb8b7a37856fa18171bc34e3462c35348b/controllers/webhook_controller.go#L113-L166)
+[full source](https://github.com/servicebinding/runtime/blob/0c819f839b4082b6e9674da2b181e3133f307213/controllers/webhook_controller.go#L100-L177)
 
 The webhook adapter can be registered with the controller manager at a path, in this case `/interceptor`. There MutatingWebhookConfiguration resource that intercepts 
 

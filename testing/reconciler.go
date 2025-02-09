@@ -23,7 +23,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/testr"
-	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/reconcilers"
 	rtime "reconciler.io/runtime/time"
@@ -121,6 +120,8 @@ type ReconcilerTestCase struct {
 	// Now is the time the test should run as, defaults to the current time. This value can be used
 	// by reconcilers via the reconcilers.RetireveNow(ctx) method.
 	Now time.Time
+	// Diff method to use to compare expected and actual values. An empty string is returned for equivalent items.
+	Diff func(expected, actual any, reason DiffReason) string
 }
 
 // VerifyFunc is a verification function for a reconciler's result
@@ -169,6 +170,9 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	if tc.Metadata == nil {
 		tc.Metadata = map[string]interface{}{}
 	}
+	if tc.Diff == nil {
+		tc.Diff = DefaultDiff
+	}
 
 	if tc.Prepare != nil {
 		var err error
@@ -188,6 +192,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 		Name:                    "default",
 		Scheme:                  scheme,
 		StatusSubResourceTypes:  tc.StatusSubResourceTypes,
+		Diff:                    tc.Diff,
 		GivenObjects:            tc.GivenObjects,
 		APIGivenObjects:         tc.APIGivenObjects,
 		WithClientBuilder:       tc.WithClientBuilder,
@@ -226,7 +231,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	}
 	if err == nil {
 		// result is only significant if there wasn't an error
-		if diff := cmp.Diff(normalizeResult(tc.ExpectedResult), normalizeResult(result)); diff != "" {
+		if diff := tc.Diff(normalizeResult(tc.ExpectedResult), normalizeResult(result), DiffReasonRaw); diff != "" {
 			t.Errorf("ExpectedResult differs (%s, %s): %s", DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}

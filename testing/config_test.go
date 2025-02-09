@@ -684,6 +684,109 @@ func TestExpectConfig(t *testing.T) {
 				`ExpectStatusPatches[0] not observed for config "test": `,
 			},
 		},
+
+		"custom diff - always different": {
+			config: ExpectConfig{
+				Diff: func(expected, actual any, reason DiffReason) string {
+					return "always different"
+				},
+				ExpectTracks: []TrackRequest{
+					NewTrackRequest(r2, r1, scheme),
+				},
+				ExpectEvents: []Event{
+					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+				},
+				ExpectCreates: []client.Object{
+					r1,
+				},
+				ExpectUpdates: []client.Object{
+					r1,
+				},
+				ExpectPatches: []PatchRef{
+					{Group: "testing.reconciler.runtime", Kind: "TestResource", Namespace: ns, Name: "resource-1", PatchType: types.MergePatchType, Patch: []byte(`{"status":{"fields":{"foo":"bar"}}}`)},
+				},
+				ExpectDeletes: []DeleteRef{
+					NewDeleteRefFromObject(r1, scheme),
+				},
+				ExpectDeleteCollections: []DeleteCollectionRef{
+					{Group: "testing.reconciler.runtime", Kind: "TestResource"},
+				},
+				ExpectStatusUpdates: []client.Object{
+					r1,
+				},
+				ExpectStatusPatches: []PatchRef{
+					{Group: "testing.reconciler.runtime", Kind: "TestResource", Namespace: ns, Name: "resource-1", SubResource: "status", PatchType: types.MergePatchType, Patch: []byte(`{"status":{"fields":{"foo":"bar"}}}`)},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Tracker.TrackObject(r2, r1)
+				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Create(ctx, r1.DeepCopy())
+				c.Update(ctx, r1.DeepCopy())
+				c.Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))
+				c.Delete(ctx, r1.DeepCopy())
+				c.DeleteAllOf(ctx, &resources.TestResourceNoStatus{})
+				c.Status().Update(ctx, r1.DeepCopy())
+				c.Status().Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))
+			},
+			failedAssertions: []string{
+				"ExpectCreates[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectUpdates[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectPatches[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectDeletes[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectDeleteCollections[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectStatusUpdates[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectStatusPatches[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectEvents[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectTracks[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+			},
+		},
+		"custom diff - never different": {
+			config: ExpectConfig{
+				Diff: func(expected, actual any, reason DiffReason) string {
+					return ""
+				},
+				ExpectTracks: []TrackRequest{
+					NewTrackRequest(r2, r1, scheme),
+				},
+				ExpectEvents: []Event{
+					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+				},
+				ExpectCreates: []client.Object{
+					r1,
+				},
+				ExpectUpdates: []client.Object{
+					r1,
+				},
+				ExpectPatches: []PatchRef{
+					{Group: "testing.reconciler.runtime", Kind: "TestResource", Namespace: ns, Name: "resource-1", PatchType: types.MergePatchType, Patch: []byte(`{"status":{"fields":{"foo":"bar"}}}`)},
+				},
+				ExpectDeletes: []DeleteRef{
+					NewDeleteRefFromObject(r1, scheme),
+				},
+				ExpectDeleteCollections: []DeleteCollectionRef{
+					{Group: "testing.reconciler.runtime", Kind: "TestResource"},
+				},
+				ExpectStatusUpdates: []client.Object{
+					r1,
+				},
+				ExpectStatusPatches: []PatchRef{
+					{Group: "testing.reconciler.runtime", Kind: "TestResource", Namespace: ns, Name: "resource-1", SubResource: "status", PatchType: types.MergePatchType, Patch: []byte(`{"status":{"fields":{"foo":"bar"}}}`)},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Tracker.TrackObject(r2, r1)
+				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Create(ctx, r1.DeepCopy())
+				c.Update(ctx, r1.DeepCopy())
+				c.Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))
+				c.Delete(ctx, r1.DeepCopy())
+				c.DeleteAllOf(ctx, &resources.TestResourceNoStatus{})
+				c.Status().Update(ctx, r1.DeepCopy())
+				c.Status().Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))
+			},
+			failedAssertions: []string{},
+		},
 	}
 
 	for name, tc := range tests {

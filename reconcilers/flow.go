@@ -98,6 +98,15 @@ func (r *IfThen[T]) Validate(ctx context.Context) error {
 		}
 	}
 
+	// validate Else
+	if r.Else != nil && validation.IsRecursive(ctx) {
+		if v, ok := r.Else.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("IfThen %q must have a valid Else: %w", r.Name, err)
+			}
+		}
+	}
+
 	return nil
 }
 

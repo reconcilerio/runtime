@@ -229,6 +229,45 @@ func TestIfThen_Validate(t *testing.T) {
 			validateNested: true,
 			shouldErr:      `IfThen "IfThen" must have a valid Then: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
+		{
+			name: "valid else",
+			reconciler: &reconcilers.IfThen[*resources.TestResource]{
+				If: func(ctx context.Context, resource *resources.TestResource) bool {
+					return false
+				},
+				Then: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+				Else: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid else",
+			reconciler: &reconcilers.IfThen[*resources.TestResource]{
+				If: func(ctx context.Context, resource *resources.TestResource) bool {
+					return false
+				},
+				Then: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+				Else: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `IfThen "IfThen" must have a valid Else: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {

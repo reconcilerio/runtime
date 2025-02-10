@@ -96,6 +96,8 @@ func (r *WithFinalizer[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 }
 
 func (r *WithFinalizer[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Finalizer value
 	if r.Finalizer == "" {
 		return fmt.Errorf("WithFinalizer %q must define Finalizer", r.Name)

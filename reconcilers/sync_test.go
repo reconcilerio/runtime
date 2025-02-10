@@ -346,7 +346,7 @@ func TestSyncReconciler_Validate(t *testing.T) {
 			name:       "empty",
 			resource:   &corev1.ConfigMap{},
 			reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
-			shouldErr:  `SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:  `SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 		{
 			name:     "valid",
@@ -386,7 +386,7 @@ func TestSyncReconciler_Validate(t *testing.T) {
 					return reconcilers.Result{}, nil
 				},
 			},
-			shouldErr: `SyncReconciler "" may not implement both Sync and SyncWithResult`,
+			shouldErr: `SyncReconciler "SyncReconciler" may not implement both Sync and SyncWithResult`,
 		},
 		{
 			name:     "valid Finalize",
@@ -426,7 +426,7 @@ func TestSyncReconciler_Validate(t *testing.T) {
 					return reconcilers.Result{}, nil
 				},
 			},
-			shouldErr: `SyncReconciler "" may not implement both Finalize and FinalizeWithResult`,
+			shouldErr: `SyncReconciler "SyncReconciler" may not implement both Finalize and FinalizeWithResult`,
 		},
 	}
 

@@ -349,7 +349,7 @@ func TestWithConfig_Validate(t *testing.T) {
 			name:       "empty",
 			resource:   &corev1.ConfigMap{},
 			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{},
-			shouldErr:  `WithConfig "" must define Config`,
+			shouldErr:  `WithConfig "WithConfig" must define Config`,
 		},
 		{
 			name:     "valid",
@@ -410,7 +410,7 @@ func TestWithConfig_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr: `WithConfig "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr: `WithConfig "WithConfig" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

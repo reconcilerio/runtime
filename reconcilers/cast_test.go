@@ -255,7 +255,7 @@ func TestCastResource_Validate(t *testing.T) {
 			name:       "empty",
 			resource:   &corev1.ConfigMap{},
 			reconciler: &reconcilers.CastResource[*corev1.ConfigMap, *corev1.Secret]{},
-			shouldErr:  `CastResource "" must define Reconciler`,
+			shouldErr:  `CastResource "SecretCastResource" must define Reconciler`,
 		},
 		{
 			name:     "valid",
@@ -300,7 +300,7 @@ func TestCastResource_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `CastResource "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `CastResource "SecretCastResource" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

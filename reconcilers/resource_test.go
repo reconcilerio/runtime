@@ -1778,7 +1778,7 @@ func TestResourceReconciler_Validate_TestResource(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `ResourceReconciler "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `ResourceReconciler "TestResourceResourceReconciler" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

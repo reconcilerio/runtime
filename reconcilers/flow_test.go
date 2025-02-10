@@ -227,7 +227,7 @@ func TestIfThen_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `IfThen "" must have a valid Then: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `IfThen "IfThen" must have a valid Then: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 
@@ -430,7 +430,7 @@ func TestWhile_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `While "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `While "While" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 
@@ -642,7 +642,7 @@ func TestForEach_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `ForEach "invalid reconciler" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `ForEach "invalid reconciler" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 
@@ -929,7 +929,7 @@ func TestTryCatch_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `TryCatch "" must have a valid Try: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `TryCatch "TryCatch" must have a valid Try: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 		{
 			name: "valid finally",
@@ -962,7 +962,7 @@ func TestTryCatch_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `TryCatch "" must have a valid Finally: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `TryCatch "TryCatch" must have a valid Finally: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 
@@ -1086,7 +1086,7 @@ func TestOverrideSetup_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr: `OverrideSetup "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr: `OverrideSetup "SkipSetup" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

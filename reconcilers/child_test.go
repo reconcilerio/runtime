@@ -1171,7 +1171,7 @@ func TestChildReconciler_Validate(t *testing.T) {
 			name:       "empty",
 			parent:     &corev1.ConfigMap{},
 			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{},
-			shouldErr:  `ChildReconciler "" must implement DesiredChild`,
+			shouldErr:  `ChildReconciler "PodChildReconciler" must implement DesiredChild`,
 		},
 		{
 			name:   "valid",

@@ -201,6 +201,8 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 }
 
 func (r *ChildReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
+	r.init()
+
 	// require DesiredChild
 	if r.DesiredChild == nil {
 		return fmt.Errorf("ChildReconciler %q must implement DesiredChild", r.Name)

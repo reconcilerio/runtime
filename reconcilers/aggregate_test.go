@@ -558,7 +558,7 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 		{
 			name:       "empty",
 			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{},
-			shouldErr:  `AggregateReconciler "" must define Request`,
+			shouldErr:  `AggregateReconciler "TestResourceAggregateReconciler" must define Request`,
 		},
 		{
 			name: "valid",
@@ -591,7 +591,7 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 			shouldErr: `AggregateReconciler "Request missing" must define Request`,
 		},
 		{
-			name: "Reconciler missing",
+			name: "valid Reconciler missing",
 			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
 				Name:    "Reconciler missing",
 				Type:    &resources.TestResource{},
@@ -599,7 +599,6 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 				// Reconciler:        Sequence{},
 				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
 			},
-			shouldErr: `AggregateReconciler "Reconciler missing" must define Reconciler and/or DesiredResource`,
 		},
 		{
 			name: "DesiredResource",
@@ -651,7 +650,7 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
 			},
 			validateNested: true,
-			shouldErr: `AggregateReconciler "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr: `AggregateReconciler "TestResourceAggregateReconciler" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

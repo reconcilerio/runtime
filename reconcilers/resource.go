@@ -177,6 +177,8 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 }
 
 func (r *ResourceReconciler[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("ResourceReconciler %q must define Reconciler", r.Name)

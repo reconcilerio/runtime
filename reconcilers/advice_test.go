@@ -243,18 +243,17 @@ func TestAdvice_Validate(t *testing.T) {
 			name:       "empty",
 			resource:   &corev1.ConfigMap{},
 			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{},
-			shouldErr:  `Advice "" must implement Reconciler`,
+			shouldErr:  `Advice "Advice" must implement Reconciler`,
 		},
 		{
-			name:     "reconciler only",
+			name:     "valid reconciler only",
 			resource: &corev1.ConfigMap{},
 			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
 				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
 			},
-			shouldErr: `Advice "" must implement at least one of Before, Around or After`,
 		},
 		{
-			name:     "valid",
+			name:     "valid all",
 			resource: &corev1.ConfigMap{},
 			reconciler: &reconcilers.Advice[*corev1.ConfigMap]{
 				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{},
@@ -328,7 +327,7 @@ func TestAdvice_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `Advice "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `Advice "Advice" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

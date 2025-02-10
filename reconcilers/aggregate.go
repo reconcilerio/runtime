@@ -192,6 +192,8 @@ func (r *AggregateReconciler[T]) SetupWithManagerYieldingController(ctx context.
 }
 
 func (r *AggregateReconciler[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Request value
 	if r.Request.Name == "" {
 		return fmt.Errorf("AggregateReconciler %q must define Request", r.Name)

@@ -337,7 +337,7 @@ func TestSequence_Validate(t *testing.T) {
 					// },
 				},
 			},
-			shouldErr: `Sequence must have a valid Sequence[1]: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr: `Sequence must have a valid Sequence[1]: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

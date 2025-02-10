@@ -93,6 +93,8 @@ func (r *CastResource[T, CT]) SetupWithManager(ctx context.Context, mgr ctrl.Man
 }
 
 func (r *CastResource[T, CT]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("CastResource %q must define Reconciler", r.Name)

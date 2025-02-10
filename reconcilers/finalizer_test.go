@@ -247,7 +247,7 @@ func TestWithFinalizer_Validate(t *testing.T) {
 			name:       "empty",
 			resource:   &corev1.ConfigMap{},
 			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{},
-			shouldErr:  `WithFinalizer "" must define Finalizer`,
+			shouldErr:  `WithFinalizer "WithFinalizer" must define Finalizer`,
 		},
 		{
 			name:     "valid",
@@ -300,7 +300,7 @@ func TestWithFinalizer_Validate(t *testing.T) {
 				},
 			},
 			validateNested: true,
-			shouldErr:      `WithFinalizer "" must have a valid Reconciler: SyncReconciler "" must implement Sync or SyncWithResult`,
+			shouldErr:      `WithFinalizer "WithFinalizer" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

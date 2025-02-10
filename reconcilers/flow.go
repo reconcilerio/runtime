@@ -79,6 +79,8 @@ func (r *IfThen[T]) init() {
 }
 
 func (r *IfThen[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate If
 	if r.If == nil {
 		return fmt.Errorf("IfThen %q must implement If", r.Name)
@@ -222,6 +224,8 @@ func (r *While[T]) init() {
 }
 
 func (r *While[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Condition
 	if r.Condition == nil {
 		return fmt.Errorf("While %q must implement Condition", r.Name)
@@ -318,12 +322,12 @@ type ForEach[Type client.Object, Item any] struct {
 
 	// Items returns the items to iterate over
 	Items func(ctx context.Context, resource Type) ([]Item, error)
+
+	lazyInit sync.Once
 }
 
 func (r *ForEach[T, I]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
-	if r.Name == "" {
-		r.Name = "ForEach"
-	}
+	r.init()
 
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
@@ -341,7 +345,17 @@ func (r *ForEach[T, I]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, 
 	return r.Setup(ctx, mgr, bldr)
 }
 
+func (r *ForEach[T, I]) init() {
+	r.lazyInit.Do(func() {
+		if r.Name == "" {
+			r.Name = "ForEach"
+		}
+	})
+}
+
 func (r *ForEach[T, I]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Reconciler
 	if r.Reconciler == nil {
 		return fmt.Errorf("ForEach %q must implement Reconciler", r.Name)
@@ -473,6 +487,8 @@ func (r *TryCatch[T]) init() {
 }
 
 func (r *TryCatch[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Try
 	if r.Try == nil {
 		return fmt.Errorf("TryCatch %q must implement Try", r.Name)
@@ -585,6 +601,8 @@ func (r *OverrideSetup[T]) init() {
 }
 
 func (r *OverrideSetup[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Setup || Reconciler
 	if r.Setup == nil && r.Reconciler == nil {
 		return fmt.Errorf("OverrideSetup %q must implement at least one of Setup or Reconciler", r.Name)

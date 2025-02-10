@@ -119,6 +119,8 @@ func (r *Advice[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr
 }
 
 func (r *Advice[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	if r.Reconciler == nil {
 		return fmt.Errorf("Advice %q must implement Reconciler", r.Name)
 	}

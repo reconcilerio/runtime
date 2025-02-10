@@ -23,8 +23,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/testr"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -129,6 +127,8 @@ type SubReconcilerTestCase[Type client.Object] struct {
 	// Now is the time the test should run as, defaults to the current time. This value can be used
 	// by reconcilers via the reconcilers.RetireveNow(ctx) method.
 	Now time.Time
+	// Differ methods to use to compare expected and actual values. An empty string is returned for equivalent items.
+	Differ Differ
 }
 
 // SubReconcilerTests represents a map of reconciler test cases. The map key is the name of each
@@ -172,6 +172,9 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	if tc.Metadata == nil {
 		tc.Metadata = map[string]interface{}{}
 	}
+	if tc.Differ == nil {
+		tc.Differ = DefaultDiffer
+	}
 
 	// Set func for verifying stashed values
 	if tc.VerifyStashedValue == nil {
@@ -179,7 +182,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 			if internal.IsNil(expected) && internal.IsNil(actual) {
 				return
 			}
-			if diff := cmp.Diff(expected, actual, reconcilers.IgnoreAllUnexported, IgnoreLastTransitionTime, IgnoreTypeMeta, IgnoreCreationTimestamp, IgnoreResourceVersion, cmpopts.EquateEmpty()); diff != "" {
+			if diff := tc.Differ.StashedValue(expected, actual, key); diff != "" {
 				t.Errorf("ExpectStashedValues[%q] differs (%s, %s): %s", key, DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 			}
 		}
@@ -213,6 +216,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		Name:                    "default",
 		Scheme:                  scheme,
 		StatusSubResourceTypes:  tc.StatusSubResourceTypes,
+		Differ:                  tc.Differ,
 		GivenObjects:            append(tc.GivenObjects, givenResource),
 		APIGivenObjects:         append(tc.APIGivenObjects, givenResource),
 		WithClientBuilder:       tc.WithClientBuilder,
@@ -282,7 +286,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	}
 	if err == nil {
 		// result is only significant if there wasn't an error
-		if diff := cmp.Diff(normalizeResult(tc.ExpectedResult), normalizeResult(result)); diff != "" {
+		if diff := tc.Differ.Result(normalizeResult(tc.ExpectedResult), normalizeResult(result)); diff != "" {
 			t.Errorf("ExpectedResult differs (%s, %s): %s", DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -300,7 +304,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		// mirror defaulting of the resource
 		expectedResource.SetResourceVersion("999")
 	}
-	if diff := cmp.Diff(expectedResource, resource, reconcilers.IgnoreAllUnexported, IgnoreLastTransitionTime, IgnoreTypeMeta, cmpopts.EquateEmpty()); diff != "" {
+	if diff := tc.Differ.Resource(expectedResource, resource); diff != "" {
 		t.Errorf("ExpectResource differs (%s, %s): %s", DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 	}
 

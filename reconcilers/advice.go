@@ -22,14 +22,13 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	_ SubReconciler[client.Object] = (*Advice[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*Advice[client.Object])(nil)
 
 // Advice is a sub reconciler for advising the lifecycle of another sub reconciler in an aspect
 // oriented programming style.
@@ -120,11 +119,21 @@ func (r *Advice[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr
 }
 
 func (r *Advice[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	if r.Reconciler == nil {
 		return fmt.Errorf("Advice %q must implement Reconciler", r.Name)
 	}
 	if r.Before == nil && r.Around == nil && r.After == nil {
 		return fmt.Errorf("Advice %q must implement at least one of Before, Around or After", r.Name)
+	}
+
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("Advice %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

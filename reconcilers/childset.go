@@ -245,6 +245,8 @@ func (r *ChildSetReconciler[T, CT, CLT]) childReconcilerFor(desired CT, desiredE
 }
 
 func (r *ChildSetReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
+	r.init()
+
 	// default implicit values
 	if r.Finalizer != "" {
 		r.SkipOwnerReference = true

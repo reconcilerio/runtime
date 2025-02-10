@@ -27,14 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/reconcilers"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-type Validator interface {
-	Validate(ctx context.Context) error
-}
 
 // ReconcilerTestCase holds a single test case of a reconciler test suite.
 type ReconcilerTestCase struct {
@@ -212,7 +209,8 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	ctx = reconcilers.StashAdditionalConfigs(ctx, configs)
 
 	r := factory(t, tc, expectConfig.Config())
-	if v, ok := r.(Validator); ok {
+	ctx = validation.WithRecursive(ctx)
+	if v, ok := r.(validation.Validator); ok {
 		if err := v.Validate(ctx); err != nil {
 			t.Fatalf("reconciler validation failed: %s", err)
 		}

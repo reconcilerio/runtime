@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/errors"
+	"reconciler.io/runtime/validation"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -32,9 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	_ SubReconciler[client.Object] = (*CastResource[client.Object, client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*CastResource[client.Object, client.Object])(nil)
 
 // CastResource casts the ResourceReconciler's type by projecting the resource data
 // onto a new struct. Casting the reconciled resource is useful to create cross
@@ -94,9 +93,18 @@ func (r *CastResource[T, CT]) SetupWithManager(ctx context.Context, mgr ctrl.Man
 }
 
 func (r *CastResource[T, CT]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("CastResource %q must define Reconciler", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("CastResource %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

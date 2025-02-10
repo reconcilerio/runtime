@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,9 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	_ SubReconciler[client.Object] = (*SyncReconciler[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*SyncReconciler[client.Object])(nil)
 
 // SyncReconciler is a sub reconciler for custom reconciliation logic. No
 // behavior is defined directly.
@@ -82,12 +81,12 @@ type SyncReconciler[Type client.Object] struct {
 	//
 	// +optional
 	FinalizeWithResult func(ctx context.Context, resource Type) (Result, error)
+
+	lazyInit sync.Once
 }
 
 func (r *SyncReconciler[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
-	if r.Name == "" {
-		r.Name = "SyncReconciler"
-	}
+	r.init()
 
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
@@ -102,7 +101,17 @@ func (r *SyncReconciler[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	return r.Setup(ctx, mgr, bldr)
 }
 
+func (r *SyncReconciler[T]) init() {
+	r.lazyInit.Do(func() {
+		if r.Name == "" {
+			r.Name = "SyncReconciler"
+		}
+	})
+}
+
 func (r *SyncReconciler[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Sync and SyncWithResult
 	if r.Sync == nil && r.SyncWithResult == nil {
 		return fmt.Errorf("SyncReconciler %q must implement Sync or SyncWithResult", r.Name)

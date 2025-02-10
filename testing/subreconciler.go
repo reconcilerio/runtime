@@ -32,6 +32,7 @@ import (
 	"reconciler.io/runtime/internal"
 	"reconciler.io/runtime/reconcilers"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -228,7 +229,8 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	c := expectConfig.Config()
 
 	r := factory(t, tc, c)
-	if v, ok := r.(Validator); ok {
+	ctx = validation.WithRecursive(ctx)
+	if v, ok := r.(validation.Validator); ok {
 		if err := v.Validate(ctx); err != nil {
 			t.Fatalf("subreconciler validation failed: %s", err)
 		}

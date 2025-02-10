@@ -34,6 +34,7 @@ import (
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
 	"reconciler.io/runtime/tracker"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -338,16 +339,17 @@ func TestWithConfig_Validate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		resource   client.Object
-		reconciler *reconcilers.WithConfig[*corev1.ConfigMap]
-		shouldErr  string
+		name           string
+		resource       client.Object
+		reconciler     *reconcilers.WithConfig[*corev1.ConfigMap]
+		validateNested bool
+		shouldErr      string
 	}{
 		{
 			name:       "empty",
 			resource:   &corev1.ConfigMap{},
 			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{},
-			shouldErr:  `WithConfig "" must define Config`,
+			shouldErr:  `WithConfig "WithConfig" must define Config`,
 		},
 		{
 			name:     "valid",
@@ -379,11 +381,45 @@ func TestWithConfig_Validate(t *testing.T) {
 			},
 			shouldErr: `WithConfig "missing reconciler" must define Reconciler`,
 		},
+		{
+			name:     "valid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{
+				Config: func(ctx context.Context, c reconcilers.Config) (reconcilers.Config, error) {
+					return config, nil
+				},
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+					Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name:     "invalid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithConfig[*corev1.ConfigMap]{
+				Config: func(ctx context.Context, c reconcilers.Config) (reconcilers.Config, error) {
+					return config, nil
+				},
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+					// Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr: `WithConfig "WithConfig" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := context.TODO()
+			if c.validateNested {
+				ctx = validation.WithRecursive(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

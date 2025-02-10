@@ -31,6 +31,7 @@ import (
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -236,16 +237,17 @@ func TestWithFinalizer(t *testing.T) {
 
 func TestWithFinalizer_Validate(t *testing.T) {
 	tests := []struct {
-		name       string
-		resource   client.Object
-		reconciler *reconcilers.WithFinalizer[*corev1.ConfigMap]
-		shouldErr  string
+		name           string
+		resource       client.Object
+		reconciler     *reconcilers.WithFinalizer[*corev1.ConfigMap]
+		validateNested bool
+		shouldErr      string
 	}{
 		{
 			name:       "empty",
 			resource:   &corev1.ConfigMap{},
 			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{},
-			shouldErr:  `WithFinalizer "" must define Finalizer`,
+			shouldErr:  `WithFinalizer "WithFinalizer" must define Finalizer`,
 		},
 		{
 			name:     "valid",
@@ -273,11 +275,41 @@ func TestWithFinalizer_Validate(t *testing.T) {
 			},
 			shouldErr: `WithFinalizer "missing reconciler" must define Reconciler`,
 		},
+		{
+			name:     "valid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{
+				Finalizer: "my-finalizer",
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+					Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name:     "invalid reconciler",
+			resource: &corev1.ConfigMap{},
+			reconciler: &reconcilers.WithFinalizer[*corev1.ConfigMap]{
+				Finalizer:  "my-finalizer",
+				Reconciler: &reconcilers.SyncReconciler[*corev1.ConfigMap]{
+					// Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `WithFinalizer "WithFinalizer" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := context.TODO()
+			if c.validateNested {
+				ctx = validation.WithRecursive(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

@@ -36,11 +36,10 @@ import (
 	"reconciler.io/runtime/internal"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/tracker"
+	"reconciler.io/runtime/validation"
 )
 
-var (
-	_ reconcile.Reconciler = (*AggregateReconciler[client.Object])(nil)
-)
+var _ reconcile.Reconciler = (*AggregateReconciler[client.Object])(nil)
 
 // AggregateReconciler is a controller-runtime reconciler that reconciles a specific resource. The
 // Type resource is fetched for the reconciler
@@ -193,19 +192,28 @@ func (r *AggregateReconciler[T]) SetupWithManagerYieldingController(ctx context.
 }
 
 func (r *AggregateReconciler[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Request value
 	if r.Request.Name == "" {
 		return fmt.Errorf("AggregateReconciler %q must define Request", r.Name)
+	}
+
+	// validate AggregateObjectManager value
+	if r.AggregateObjectManager == nil {
+		return fmt.Errorf("AggregateReconciler %q must define AggregateObjectManager", r.Name)
 	}
 
 	// validate Reconciler value
 	if r.Reconciler == nil && r.DesiredResource == nil {
 		return fmt.Errorf("AggregateReconciler %q must define Reconciler and/or DesiredResource", r.Name)
 	}
-
-	// validate AggregateObjectManager value
-	if r.AggregateObjectManager == nil {
-		return fmt.Errorf("AggregateReconciler %q must define AggregateObjectManager", r.Name)
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("AggregateReconciler %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

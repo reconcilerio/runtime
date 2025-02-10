@@ -24,15 +24,14 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var (
-	_ SubReconciler[client.Object] = (*WithFinalizer[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*WithFinalizer[client.Object])(nil)
 
 // WithFinalizer ensures the resource being reconciled has the desired finalizer set so that state
 // can be cleaned up upon the resource being deleted. The finalizer is added to the resource, if not
@@ -97,6 +96,8 @@ func (r *WithFinalizer[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 }
 
 func (r *WithFinalizer[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Finalizer value
 	if r.Finalizer == "" {
 		return fmt.Errorf("WithFinalizer %q must define Finalizer", r.Name)
@@ -105,6 +106,13 @@ func (r *WithFinalizer[T]) Validate(ctx context.Context) error {
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("WithFinalizer %q must define Reconciler", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("WithFinalizer %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

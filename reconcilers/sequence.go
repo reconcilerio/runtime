@@ -21,14 +21,13 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	_ SubReconciler[client.Object] = (Sequence[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (Sequence[client.Object])(nil)
 
 // Sequence is a collection of SubReconcilers called in order. If a
 // reconciler errs, further reconcilers are skipped.
@@ -63,4 +62,19 @@ func (r Sequence[T]) Reconcile(ctx context.Context, resource T) (Result, error) 
 	}
 
 	return aggregateResult, nil
+}
+
+func (r *Sequence[T]) Validate(ctx context.Context) error {
+	// validate Sequence
+	if validation.IsRecursive(ctx) {
+		for i, reconciler := range *r {
+			if v, ok := reconciler.(validation.Validator); ok {
+				if err := v.Validate(ctx); err != nil {
+					return fmt.Errorf("Sequence must have a valid Sequence[%d]: %w", i, err)
+				}
+			}
+		}
+	}
+
+	return nil
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,6 +36,7 @@ import (
 	"github.com/go-logr/logr"
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/tracker"
+	"reconciler.io/runtime/validation"
 )
 
 // Config holds common resources for controllers. The configuration may be
@@ -116,9 +118,7 @@ func NewConfig(mgr ctrl.Manager, apiType client.Object, syncPeriod time.Duration
 	}.WithCluster(mgr)
 }
 
-var (
-	_ SubReconciler[client.Object] = (*WithConfig[client.Object])(nil)
-)
+var _ SubReconciler[client.Object] = (*WithConfig[client.Object])(nil)
 
 // Experimental: WithConfig injects the provided config into the reconcilers nested under it. For
 // example, the client can be swapped to use a service account with different permissions, or to
@@ -142,12 +142,12 @@ type WithConfig[Type client.Object] struct {
 	// resource being reconciled. Typically a Sequence is used to compose
 	// multiple SubReconcilers.
 	Reconciler SubReconciler[Type]
+
+	lazyInit sync.Once
 }
 
 func (r *WithConfig[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
-	if r.Name == "" {
-		r.Name = "WithConfig"
-	}
+	r.init()
 
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
@@ -164,7 +164,17 @@ func (r *WithConfig[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, 
 	return r.Reconciler.SetupWithManager(ctx, mgr, bldr)
 }
 
+func (r *WithConfig[T]) init() {
+	r.lazyInit.Do(func() {
+		if r.Name == "" {
+			r.Name = "WithConfig"
+		}
+	})
+}
+
 func (r *WithConfig[T]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Config value
 	if r.Config == nil {
 		return fmt.Errorf("WithConfig %q must define Config", r.Name)
@@ -173,6 +183,13 @@ func (r *WithConfig[T]) Validate(ctx context.Context) error {
 	// validate Reconciler value
 	if r.Reconciler == nil {
 		return fmt.Errorf("WithConfig %q must define Reconciler", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("WithConfig %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

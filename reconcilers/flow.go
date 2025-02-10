@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/utils/ptr"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -78,14 +79,32 @@ func (r *IfThen[T]) init() {
 }
 
 func (r *IfThen[T]) Validate(ctx context.Context) error {
-	// require If
+	r.init()
+
+	// validate If
 	if r.If == nil {
 		return fmt.Errorf("IfThen %q must implement If", r.Name)
 	}
 
-	// require Then
+	// validate Then
 	if r.Then == nil {
 		return fmt.Errorf("IfThen %q must implement Then", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Then.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("IfThen %q must have a valid Then: %w", r.Name, err)
+			}
+		}
+	}
+
+	// validate Else
+	if r.Else != nil && validation.IsRecursive(ctx) {
+		if v, ok := r.Else.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("IfThen %q must have a valid Else: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -214,14 +233,23 @@ func (r *While[T]) init() {
 }
 
 func (r *While[T]) Validate(ctx context.Context) error {
-	// require If
+	r.init()
+
+	// validate Condition
 	if r.Condition == nil {
 		return fmt.Errorf("While %q must implement Condition", r.Name)
 	}
 
-	// require Reconciler
+	// validate Reconciler
 	if r.Reconciler == nil {
 		return fmt.Errorf("While %q must implement Reconciler", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("While %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -303,12 +331,12 @@ type ForEach[Type client.Object, Item any] struct {
 
 	// Items returns the items to iterate over
 	Items func(ctx context.Context, resource Type) ([]Item, error)
+
+	lazyInit sync.Once
 }
 
 func (r *ForEach[T, I]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error {
-	if r.Name == "" {
-		r.Name = "ForEach"
-	}
+	r.init()
 
 	log := logr.FromContextOrDiscard(ctx).
 		WithName(r.Name)
@@ -326,13 +354,30 @@ func (r *ForEach[T, I]) SetupWithManager(ctx context.Context, mgr ctrl.Manager, 
 	return r.Setup(ctx, mgr, bldr)
 }
 
+func (r *ForEach[T, I]) init() {
+	r.lazyInit.Do(func() {
+		if r.Name == "" {
+			r.Name = "ForEach"
+		}
+	})
+}
+
 func (r *ForEach[T, I]) Validate(ctx context.Context) error {
+	r.init()
+
 	// validate Reconciler
 	if r.Reconciler == nil {
 		return fmt.Errorf("ForEach %q must implement Reconciler", r.Name)
 	}
 	if r.Items == nil {
 		return fmt.Errorf("ForEach %q must implement Items", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("ForEach %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -451,9 +496,27 @@ func (r *TryCatch[T]) init() {
 }
 
 func (r *TryCatch[T]) Validate(ctx context.Context) error {
-	// require Try
+	r.init()
+
+	// validate Try
 	if r.Try == nil {
 		return fmt.Errorf("TryCatch %q must implement Try", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Try.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("TryCatch %q must have a valid Try: %w", r.Name, err)
+			}
+		}
+	}
+
+	// validate Finally
+	if r.Finally != nil && validation.IsRecursive(ctx) {
+		if v, ok := r.Finally.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("TryCatch %q must have a valid Finally: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil
@@ -547,8 +610,20 @@ func (r *OverrideSetup[T]) init() {
 }
 
 func (r *OverrideSetup[T]) Validate(ctx context.Context) error {
+	r.init()
+
+	// validate Setup || Reconciler
 	if r.Setup == nil && r.Reconciler == nil {
 		return fmt.Errorf("OverrideSetup %q must implement at least one of Setup or Reconciler", r.Name)
+	}
+
+	// validate Reconciler
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("OverrideSetup %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

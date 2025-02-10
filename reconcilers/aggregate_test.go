@@ -36,6 +36,7 @@ import (
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -548,15 +549,16 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.AggregateReconciler[*resources.TestResource]
-		shouldErr    string
-		expectedLogs []string
+		name           string
+		reconciler     *reconcilers.AggregateReconciler[*resources.TestResource]
+		validateNested bool
+		shouldErr      string
+		expectedLogs   []string
 	}{
 		{
 			name:       "empty",
 			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{},
-			shouldErr:  `AggregateReconciler "" must define Request`,
+			shouldErr:  `AggregateReconciler "TestResourceAggregateReconciler" must define Request`,
 		},
 		{
 			name: "valid",
@@ -589,7 +591,7 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 			shouldErr: `AggregateReconciler "Request missing" must define Request`,
 		},
 		{
-			name: "Reconciler missing",
+			name: "valid Reconciler missing",
 			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
 				Name:    "Reconciler missing",
 				Type:    &resources.TestResource{},
@@ -597,7 +599,6 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 				// Reconciler:        Sequence{},
 				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
 			},
-			shouldErr: `AggregateReconciler "Reconciler missing" must define Reconciler and/or DesiredResource`,
 		},
 		{
 			name: "DesiredResource",
@@ -622,12 +623,44 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 			},
 			shouldErr: `AggregateReconciler "AggregateObjectManager missing" must define AggregateObjectManager`,
 		},
+		{
+			name: "valid reconciler",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Type:       &resources.TestResource{},
+				Request:    req,
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid reconciler",
+			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
+				Type:       &resources.TestResource{},
+				Request:    req,
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			},
+			validateNested: true,
+			shouldErr: `AggregateReconciler "TestResourceAggregateReconciler" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
+		},
 	}
 
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			if c.validateNested {
+				ctx = validation.WithRecursive(ctx)
+			}
 			err := c.reconciler.Validate(ctx)
 			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
 				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)

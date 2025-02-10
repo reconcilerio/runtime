@@ -59,8 +59,8 @@ type ExpectConfig struct {
 	// Interacting with a status sub-resource for a type not enumerated as having a status
 	// sub-resource will return a not found error.
 	StatusSubResourceTypes []client.Object
-	// Diff method to use to compare expected and actual values
-	Diff func(expected, actual any, reason DiffReason) string
+	// Differ methods to use to compare expected and actual values
+	Differ Differ
 
 	// GivenObjects build the kubernetes objects which are present at the onset of reconciliation
 	GivenObjects []client.Object
@@ -128,8 +128,8 @@ func (c *ExpectConfig) init() {
 		}
 		c.tracker = createTracker(c.GivenTracks, c.Scheme)
 		c.observedErrors = []string{}
-		if c.Diff == nil {
-			c.Diff = DefaultDiff
+		if c.Differ == nil {
+			c.Differ = DefaultDiffer
 		}
 	})
 }
@@ -210,7 +210,7 @@ func (c *ExpectConfig) AssertClientCreateExpectations(t *testing.T) {
 	}
 	c.init()
 
-	c.compareActions(t, "Create", c.ExpectCreates, c.client.CreateActions, DiffReasonResourceCreate)
+	c.compareActions(t, "Create", c.ExpectCreates, c.client.CreateActions, c.Differ.ResourceCreate)
 }
 
 // AssertClientUpdateExpectations asserts observed reconciler client update behavior matches the expected client update behavior
@@ -220,7 +220,7 @@ func (c *ExpectConfig) AssertClientUpdateExpectations(t *testing.T) {
 	}
 	c.init()
 
-	c.compareActions(t, "Update", c.ExpectUpdates, c.client.UpdateActions, DiffReasonResourceUpdate)
+	c.compareActions(t, "Update", c.ExpectUpdates, c.client.UpdateActions, c.Differ.ResourceUpdate)
 }
 
 // AssertClientPatchExpectations asserts observed reconciler client patch behavior matches the expected client patch behavior
@@ -237,7 +237,7 @@ func (c *ExpectConfig) AssertClientPatchExpectations(t *testing.T) {
 		}
 		actual := NewPatchRef(c.client.PatchActions[i])
 
-		if diff := c.Diff(exp, actual, DiffReasonRaw); diff != "" {
+		if diff := c.Differ.Raw(exp, actual); diff != "" {
 			c.errorf(t, "ExpectPatches[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -262,7 +262,7 @@ func (c *ExpectConfig) AssertClientDeleteExpectations(t *testing.T) {
 		}
 		actual := NewDeleteRef(c.client.DeleteActions[i])
 
-		if diff := c.Diff(exp, actual, DiffReasonRaw); diff != "" {
+		if diff := c.Differ.Raw(exp, actual); diff != "" {
 			c.errorf(t, "ExpectDeletes[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -287,7 +287,7 @@ func (c *ExpectConfig) AssertClientDeleteCollectionExpectations(t *testing.T) {
 		}
 		actual := NewDeleteCollectionRef(c.client.DeleteCollectionActions[i])
 
-		if diff := c.Diff(exp, actual, DiffReasonDeleteCollectionRef); diff != "" {
+		if diff := c.Differ.DeleteCollectionRef(exp, actual); diff != "" {
 			c.errorf(t, "ExpectDeleteCollections[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -305,7 +305,7 @@ func (c *ExpectConfig) AssertClientStatusUpdateExpectations(t *testing.T) {
 	}
 	c.init()
 
-	c.compareActions(t, "StatusUpdate", c.ExpectStatusUpdates, c.client.StatusUpdateActions, DiffReasonResourceStatusUpdate)
+	c.compareActions(t, "StatusUpdate", c.ExpectStatusUpdates, c.client.StatusUpdateActions, c.Differ.ResourceStatusUpdate)
 }
 
 // AssertClientStatusPatchExpectations asserts observed reconciler client status patch behavior matches the expected client status patch behavior
@@ -322,7 +322,7 @@ func (c *ExpectConfig) AssertClientStatusPatchExpectations(t *testing.T) {
 		}
 		actual := NewPatchRef(c.client.StatusPatchActions[i])
 
-		if diff := c.Diff(exp, actual, DiffReasonRaw); diff != "" {
+		if diff := c.Differ.Raw(exp, actual); diff != "" {
 			c.errorf(t, "ExpectStatusPatches[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -347,7 +347,7 @@ func (c *ExpectConfig) AssertRecorderExpectations(t *testing.T) {
 			continue
 		}
 
-		if diff := c.Diff(exp, actualEvents[i], DiffReasonRaw); diff != "" {
+		if diff := c.Differ.Raw(exp, actualEvents[i]); diff != "" {
 			c.errorf(t, "ExpectEvents[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -374,7 +374,7 @@ func (c *ExpectConfig) AssertTrackerExpectations(t *testing.T) {
 			continue
 		}
 
-		if diff := c.Diff(exp, actualTracks[i], DiffReasonTrackRequest); diff != "" {
+		if diff := c.Differ.TrackRequest(exp, actualTracks[i]); diff != "" {
 			c.errorf(t, "ExpectTracks[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -385,7 +385,7 @@ func (c *ExpectConfig) AssertTrackerExpectations(t *testing.T) {
 	}
 }
 
-func (c *ExpectConfig) compareActions(t *testing.T, actionName string, expectedActionFactories []client.Object, actualActions []objectAction, diffReason DiffReason) {
+func (c *ExpectConfig) compareActions(t *testing.T, actionName string, expectedActionFactories []client.Object, actualActions []objectAction, differ func(client.Object, client.Object) string) {
 	if t != nil {
 		t.Helper()
 	}
@@ -398,7 +398,7 @@ func (c *ExpectConfig) compareActions(t *testing.T, actionName string, expectedA
 		}
 		actual := actualActions[i].GetObject()
 
-		if diff := c.Diff(exp.DeepCopyObject(), actual, diffReason); diff != "" {
+		if diff := differ(exp.DeepCopyObject().(client.Object), actual.(client.Object)); diff != "" {
 			c.errorf(t, "Expect%ss[%d] differs%s (%s, %s):\n%s", actionName, i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}

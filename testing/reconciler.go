@@ -120,8 +120,8 @@ type ReconcilerTestCase struct {
 	// Now is the time the test should run as, defaults to the current time. This value can be used
 	// by reconcilers via the reconcilers.RetireveNow(ctx) method.
 	Now time.Time
-	// Diff method to use to compare expected and actual values. An empty string is returned for equivalent items.
-	Diff func(expected, actual any, reason DiffReason) string
+	// Differ methods to use to compare expected and actual values. An empty string is returned for equivalent items.
+	Differ Differ
 }
 
 // VerifyFunc is a verification function for a reconciler's result
@@ -170,8 +170,8 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	if tc.Metadata == nil {
 		tc.Metadata = map[string]interface{}{}
 	}
-	if tc.Diff == nil {
-		tc.Diff = DefaultDiff
+	if tc.Differ == nil {
+		tc.Differ = DefaultDiffer
 	}
 
 	if tc.Prepare != nil {
@@ -192,7 +192,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 		Name:                    "default",
 		Scheme:                  scheme,
 		StatusSubResourceTypes:  tc.StatusSubResourceTypes,
-		Diff:                    tc.Diff,
+		Differ:                  tc.Differ,
 		GivenObjects:            tc.GivenObjects,
 		APIGivenObjects:         tc.APIGivenObjects,
 		WithClientBuilder:       tc.WithClientBuilder,
@@ -231,7 +231,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	}
 	if err == nil {
 		// result is only significant if there wasn't an error
-		if diff := tc.Diff(normalizeResult(tc.ExpectedResult), normalizeResult(result), DiffReasonRaw); diff != "" {
+		if diff := tc.Differ.Raw(normalizeResult(tc.ExpectedResult), normalizeResult(result)); diff != "" {
 			t.Errorf("ExpectedResult differs (%s, %s): %s", DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}

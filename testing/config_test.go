@@ -687,8 +687,8 @@ func TestExpectConfig(t *testing.T) {
 
 		"custom diff - always different": {
 			config: ExpectConfig{
-				Diff: func(expected, actual any, reason DiffReason) string {
-					return "always different"
+				Differ: &staticDiffer{
+					diff: "always different",
 				},
 				ExpectTracks: []TrackRequest{
 					NewTrackRequest(r2, r1, scheme),
@@ -743,8 +743,8 @@ func TestExpectConfig(t *testing.T) {
 		},
 		"custom diff - never different": {
 			config: ExpectConfig{
-				Diff: func(expected, actual any, reason DiffReason) string {
-					return ""
+				Differ: &staticDiffer{
+					diff: "",
 				},
 				ExpectTracks: []TrackRequest{
 					NewTrackRequest(r2, r1, scheme),

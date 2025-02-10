@@ -284,7 +284,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	}
 	if err == nil {
 		// result is only significant if there wasn't an error
-		if diff := tc.Differ.Raw(normalizeResult(tc.ExpectedResult), normalizeResult(result)); diff != "" {
+		if diff := tc.Differ.Result(normalizeResult(tc.ExpectedResult), normalizeResult(result)); diff != "" {
 			t.Errorf("ExpectedResult differs (%s, %s): %s", DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}

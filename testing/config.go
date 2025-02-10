@@ -237,7 +237,7 @@ func (c *ExpectConfig) AssertClientPatchExpectations(t *testing.T) {
 		}
 		actual := NewPatchRef(c.client.PatchActions[i])
 
-		if diff := c.Differ.Raw(exp, actual); diff != "" {
+		if diff := c.Differ.PatchRef(exp, actual); diff != "" {
 			c.errorf(t, "ExpectPatches[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -262,7 +262,7 @@ func (c *ExpectConfig) AssertClientDeleteExpectations(t *testing.T) {
 		}
 		actual := NewDeleteRef(c.client.DeleteActions[i])
 
-		if diff := c.Differ.Raw(exp, actual); diff != "" {
+		if diff := c.Differ.DeleteRef(exp, actual); diff != "" {
 			c.errorf(t, "ExpectDeletes[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -322,7 +322,7 @@ func (c *ExpectConfig) AssertClientStatusPatchExpectations(t *testing.T) {
 		}
 		actual := NewPatchRef(c.client.StatusPatchActions[i])
 
-		if diff := c.Differ.Raw(exp, actual); diff != "" {
+		if diff := c.Differ.PatchRef(exp, actual); diff != "" {
 			c.errorf(t, "ExpectStatusPatches[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}
@@ -347,7 +347,7 @@ func (c *ExpectConfig) AssertRecorderExpectations(t *testing.T) {
 			continue
 		}
 
-		if diff := c.Differ.Raw(exp, actualEvents[i]); diff != "" {
+		if diff := c.Differ.Event(exp, actualEvents[i]); diff != "" {
 			c.errorf(t, "ExpectEvents[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
 		}
 	}

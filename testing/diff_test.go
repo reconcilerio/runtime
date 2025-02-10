@@ -26,11 +26,23 @@ type staticDiffer struct {
 	diff string
 }
 
-func (d *staticDiffer) Raw(expected, actual any) string {
+func (d *staticDiffer) Result(expected, actual reconcilers.Result) string {
 	return d.diff
 }
 
 func (d *staticDiffer) TrackRequest(expected, actual TrackRequest) string {
+	return d.diff
+}
+
+func (d *staticDiffer) Event(expected, actual Event) string {
+	return d.diff
+}
+
+func (d *staticDiffer) PatchRef(expected, actual PatchRef) string {
+	return d.diff
+}
+
+func (d *staticDiffer) DeleteRef(expected, actual DeleteRef) string {
 	return d.diff
 }
 

@@ -25,8 +25,11 @@ import (
 )
 
 type Differ interface {
-	Raw(expected, actual any) string
+	Result(expected, actual reconcilers.Result) string
 	TrackRequest(expected, actual TrackRequest) string
+	Event(expected, actual Event) string
+	PatchRef(expected, actual PatchRef) string
+	DeleteRef(expected, actual DeleteRef) string
 	DeleteCollectionRef(expected, actual DeleteCollectionRef) string
 	StashedValue(expected, actual any, key reconcilers.StashKey) string
 	Resource(expected, actual client.Object) string
@@ -42,12 +45,24 @@ var DefaultDiffer Differ = &differ{}
 
 type differ struct{}
 
-func (*differ) Raw(expected, actual any) string {
+func (*differ) Result(expected, actual reconcilers.Result) string {
 	return cmp.Diff(expected, actual)
 }
 
 func (*differ) TrackRequest(expected, actual TrackRequest) string {
 	return cmp.Diff(expected, actual, NormalizeLabelSelector)
+}
+
+func (*differ) Event(expected, actual Event) string {
+	return cmp.Diff(expected, actual)
+}
+
+func (*differ) PatchRef(expected, actual PatchRef) string {
+	return cmp.Diff(expected, actual)
+}
+
+func (*differ) DeleteRef(expected, actual DeleteRef) string {
+	return cmp.Diff(expected, actual)
 }
 
 func (*differ) DeleteCollectionRef(expected, actual DeleteCollectionRef) string {

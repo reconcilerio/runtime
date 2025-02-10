@@ -203,7 +203,7 @@ func (r *ResourceReconciler[T]) Validate(ctx context.Context) error {
 		log.Info("resource status missing ObservedGeneration field of type int64, generation will not be managed")
 	}
 
-	initializeConditionsMethod, hasInitializeConditions := reflect.PtrTo(statusType).MethodByName("InitializeConditions")
+	initializeConditionsMethod, hasInitializeConditions := reflect.PointerTo(statusType).MethodByName("InitializeConditions")
 	if !hasInitializeConditions || initializeConditionsMethod.Type.NumIn() > 2 || initializeConditionsMethod.Type.NumOut() != 0 {
 		log.Info("resource status missing InitializeConditions(context.Context) method, conditions will not be auto-initialized")
 	} else if hasInitializeConditions && initializeConditionsMethod.Type.NumIn() == 1 {

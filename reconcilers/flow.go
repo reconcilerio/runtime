@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -208,7 +208,7 @@ func (r *While[T]) init() {
 			r.Name = "While"
 		}
 		if r.MaxIterations == nil {
-			r.MaxIterations = pointer.Int(100)
+			r.MaxIterations = ptr.To(100)
 		}
 	})
 }

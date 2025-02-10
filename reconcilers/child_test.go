@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	diecorev1 "reconciler.io/dies/apis/core/v1"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/apis"
@@ -80,7 +80,7 @@ func TestChildReconciler(t *testing.T) {
 		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 		})
 
-	defaultChildReconciler := func(c reconcilers.Config) *reconcilers.ChildReconciler[*resources.TestResource, *corev1.ConfigMap, *corev1.ConfigMapList] {
+	defaultChildReconciler := func(_ reconcilers.Config) *reconcilers.ChildReconciler[*resources.TestResource, *corev1.ConfigMap, *corev1.ConfigMapList] {
 		return &reconcilers.ChildReconciler[*resources.TestResource, *corev1.ConfigMap, *corev1.ConfigMapList]{
 			DesiredChild: func(ctx context.Context, parent *resources.TestResource) (*corev1.ConfigMap, error) {
 				if len(parent.Spec.Fields) == 0 {
@@ -215,9 +215,9 @@ func TestChildReconciler(t *testing.T) {
 									Kind:       "TestResource",
 									Name:       resource.GetName(),
 									UID:        resource.GetUID(),
-									Controller: pointer.Bool(true),
+									Controller: ptr.To(true),
 									// the default controller ref is set to block
-									BlockOwnerDeletion: pointer.Bool(false),
+									BlockOwnerDeletion: ptr.To(false),
 								},
 							}
 						}
@@ -243,8 +243,8 @@ func TestChildReconciler(t *testing.T) {
 								Kind:               "TestResource",
 								Name:               resource.GetName(),
 								UID:                resource.GetUID(),
-								Controller:         pointer.Bool(true),
-								BlockOwnerDeletion: pointer.Bool(false),
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(false),
 							},
 						)
 					}),
@@ -695,7 +695,7 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 		})
 
-	defaultChildReconciler := func(c reconcilers.Config) *reconcilers.ChildReconciler[*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.UnstructuredList] {
+	defaultChildReconciler := func(_ reconcilers.Config) *reconcilers.ChildReconciler[*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.UnstructuredList] {
 		return &reconcilers.ChildReconciler[*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.UnstructuredList]{
 			ChildType: &unstructured.Unstructured{
 				Object: map[string]interface{}{

@@ -10,9 +10,9 @@ require (
 	golang.org/x/net v0.35.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0
 	gomodules.xyz/jsonpatch/v3 v3.0.1
-	k8s.io/api v0.32.1
-	k8s.io/apimachinery v0.32.1
-	k8s.io/client-go v0.32.1
+	k8s.io/api v0.32.2
+	k8s.io/apimachinery v0.32.2
+	k8s.io/client-go v0.32.2
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	reconciler.io/dies v0.15.0
 	sigs.k8s.io/controller-runtime v0.20.1

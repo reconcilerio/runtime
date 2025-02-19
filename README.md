@@ -1169,6 +1169,8 @@ Backwards support may be removed in a future release, users are encouraged to mi
 - status `InitializeConditions()` is deprecated in favor of `InitializeConditions(context.Context)`.
 - `ConditionSet#Manage` is deprecated in favor of `ConditionSet#ManageWithContext`.
 - `HaltSubReconcilers` is deprecated in favor of `ErrHaltSubReconcilers`.
+- `AdmissionWebhookAdapter#Build` is deprecated in favor of `AdmissionWebhookAdapter#BuildWithContext`.
+- `AdmissionWebhookTestSuite#Run`, `AdmissionWebhookTests#Run`, and `AdmissionWebhookTestCase#Run` are deprecated in favor of `#RunWithContext`.
 
 ## Community
 

@@ -40,6 +40,7 @@ import (
 	"reconciler.io/runtime/reconcilers"
 	rtesting "reconciler.io/runtime/testing"
 	"reconciler.io/runtime/tracker"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -351,7 +352,7 @@ func TestAdmissionWebhookAdapter(t *testing.T) {
 				AdmissionResponse: response.DieRelease(),
 			},
 			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.AdmissionWebhookTestCase) (context.Context, error) {
-				key := "test-key"
+				key := reconcilers.StashKey("test-key")
 				value := "test-value"
 				ctx = context.WithValue(ctx, key, value)
 
@@ -375,13 +376,92 @@ func TestAdmissionWebhookAdapter(t *testing.T) {
 				return ctx, nil
 			},
 		},
+		"invalid nested reconciler": {
+			Skip: true,
+			Request: &admission.Request{
+				AdmissionRequest: request.
+					Object(resource.DieReleaseRawExtension()).
+					DieRelease(),
+			},
+			ExpectedResponse: admission.Response{
+				AdmissionResponse: response.DieRelease(),
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						// 	return nil
+						// },
+					}
+				},
+			},
+		},
 	}
 
-	wts.Run(t, scheme, func(t *testing.T, wtc *rtesting.AdmissionWebhookTestCase, c reconcilers.Config) *admission.Webhook {
+	wts.RunWithContext(t, scheme, func(t *testing.T, ctx context.Context, wtc *rtesting.AdmissionWebhookTestCase, c reconcilers.Config) (*admission.Webhook, error) {
 		return (&reconcilers.AdmissionWebhookAdapter[*resources.TestResource]{
 			Type:       &resources.TestResource{},
 			Reconciler: wtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c),
 			Config:     c,
-		}).Build()
+		}).BuildWithContext(ctx)
 	})
+}
+
+func TestAdmissionWebhookAdapter_Validate(t *testing.T) {
+	tests := []struct {
+		name           string
+		webhook        *reconcilers.AdmissionWebhookAdapter[*resources.TestResource]
+		validateNested bool
+		shouldErr      string
+	}{
+		{
+			name: "valid",
+			webhook: &reconcilers.AdmissionWebhookAdapter[*resources.TestResource]{
+				Reconciler: reconcilers.Sequence[*resources.TestResource]{},
+			},
+		},
+		{
+			name: "missing reconciler",
+			webhook: &reconcilers.AdmissionWebhookAdapter[*resources.TestResource]{
+				Name: "missing reconciler",
+			},
+			shouldErr: `AdmissionWebhookAdapter "missing reconciler" must define Reconciler`,
+		},
+		{
+			name: "valid reconciler",
+			webhook: &reconcilers.AdmissionWebhookAdapter[*resources.TestResource]{
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						return nil
+					},
+				},
+			},
+			validateNested: true,
+		},
+		{
+			name: "invalid reconciler",
+			webhook: &reconcilers.AdmissionWebhookAdapter[*resources.TestResource]{
+				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
+					// Sync: func(ctx context.Context, resource *resources.TestResource) error {
+					// 	return nil
+					// },
+				},
+			},
+			validateNested: true,
+			shouldErr:      `AdmissionWebhookAdapter "TestResourceAdmissionWebhookAdapter" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := context.TODO()
+			if c.validateNested {
+				ctx = validation.WithRecursive(ctx)
+			}
+			err := c.webhook.Validate(ctx)
+			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			}
+		})
+	}
 }

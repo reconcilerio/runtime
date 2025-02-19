@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"reconciler.io/runtime/internal"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -115,30 +116,72 @@ func (r *AdmissionWebhookAdapter[T]) init() {
 	})
 }
 
-func (r *AdmissionWebhookAdapter[T]) Build() *admission.Webhook {
+func (r *AdmissionWebhookAdapter[T]) Validate(ctx context.Context) error {
 	r.init()
+
+	// validate Reconciler value
+	if r.Reconciler == nil {
+		return fmt.Errorf("AdmissionWebhookAdapter %q must define Reconciler", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.Reconciler.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("AdmissionWebhookAdapter %q must have a valid Reconciler: %w", r.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// Deprecated use BuildWithContext
+func (r *AdmissionWebhookAdapter[T]) Build() *admission.Webhook {
+	webhook, err := r.BuildWithContext(context.TODO())
+	if err != nil {
+		panic(err)
+	}
+	return webhook
+}
+
+func (r *AdmissionWebhookAdapter[T]) BuildWithContext(ctx context.Context) (*admission.Webhook, error) {
+	r.init()
+
+	if err := r.Validate(r.withContext(ctx)); err != nil {
+		return nil, err
+	}
+
 	return &admission.Webhook{
 		Handler: r,
 		WithContextFunc: func(ctx context.Context, req *http.Request) context.Context {
+			ctx = r.withContext(ctx)
+
 			log := crlog.FromContext(ctx).
-				WithName("controller-runtime.webhook.webhooks").
-				WithName(r.Name).
 				WithValues(
 					"webhook", req.URL.Path,
 				)
 			ctx = logr.NewContext(ctx, log)
 
-			ctx = WithStash(ctx)
-
-			ctx = StashConfig(ctx, r.Config)
-			ctx = StashOriginalConfig(ctx, r.Config)
-			ctx = StashResourceType(ctx, r.Type)
-			ctx = StashOriginalResourceType(ctx, r.Type)
 			ctx = StashHTTPRequest(ctx, req)
 
 			return ctx
 		},
-	}
+	}, nil
+}
+
+func (r *AdmissionWebhookAdapter[T]) withContext(ctx context.Context) context.Context {
+	log := crlog.FromContext(ctx).
+		WithName("controller-runtime.webhook.webhooks").
+		WithName(r.Name)
+	ctx = logr.NewContext(ctx, log)
+
+	ctx = WithStash(ctx)
+
+	ctx = StashConfig(ctx, r.Config)
+	ctx = StashOriginalConfig(ctx, r.Config)
+	ctx = StashResourceType(ctx, r.Type)
+	ctx = StashOriginalResourceType(ctx, r.Type)
+
+	return ctx
 }
 
 // Handle implements admission.Handler

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/reconcilers"
 	rtime "reconciler.io/runtime/time"
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -122,7 +123,7 @@ type AdmissionWebhookTestCase struct {
 // test case.  Test cases are executed in random order.
 type AdmissionWebhookTests map[string]AdmissionWebhookTestCase
 
-// Run executes the test cases.
+// Deprecated use RunWithContext instead
 func (wt AdmissionWebhookTests) Run(t *testing.T, scheme *runtime.Scheme, factory AdmissionWebhookFactory) {
 	t.Helper()
 	wts := AdmissionWebhookTestSuite{}
@@ -133,12 +134,31 @@ func (wt AdmissionWebhookTests) Run(t *testing.T, scheme *runtime.Scheme, factor
 	wts.Run(t, scheme, factory)
 }
 
+// Run executes the test cases.
+func (wt AdmissionWebhookTests) RunWithContext(t *testing.T, scheme *runtime.Scheme, factory AdmissionWebhookFactoryWithContext) {
+	t.Helper()
+	wts := AdmissionWebhookTestSuite{}
+	for name, wtc := range wt {
+		wtc.Name = name
+		wts = append(wts, wtc)
+	}
+	wts.RunWithContext(t, scheme, factory)
+}
+
 // AdmissionWebhookTestSuite represents a list of webhook test cases. The test cases are
 // executed in order.
 type AdmissionWebhookTestSuite []AdmissionWebhookTestCase
 
-// Run executes the test case.
+// Deprecated use RunWithContext instead
 func (tc *AdmissionWebhookTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory AdmissionWebhookFactory) {
+	tc.RunWithContext(t, scheme, func(t *testing.T, ctx context.Context, wtc *AdmissionWebhookTestCase, c reconcilers.Config) (*admission.Webhook, error) {
+		webhook := factory(t, wtc, c)
+		return webhook, nil
+	})
+}
+
+// Run executes the test case.
+func (tc *AdmissionWebhookTestCase) RunWithContext(t *testing.T, scheme *runtime.Scheme, factory AdmissionWebhookFactoryWithContext) {
 	t.Helper()
 	if tc.Skip {
 		t.SkipNow()
@@ -155,6 +175,7 @@ func (tc *AdmissionWebhookTestCase) Run(t *testing.T, scheme *runtime.Scheme, fa
 		ctx, cancel = context.WithDeadline(ctx, deadline)
 		defer cancel()
 	}
+	ctx = validation.WithRecursive(ctx)
 
 	if tc.Metadata == nil {
 		tc.Metadata = map[string]interface{}{}
@@ -199,7 +220,10 @@ func (tc *AdmissionWebhookTestCase) Run(t *testing.T, scheme *runtime.Scheme, fa
 	}
 
 	c := expectConfig.Config()
-	r := factory(t, tc, c)
+	r, err := factory(t, ctx, tc, c)
+	if err != nil {
+		t.Fatalf("Webhook factory failed: %s", err)
+	}
 
 	// Run the Reconcile we're testing.
 	response := func() admission.Response {
@@ -239,8 +263,16 @@ func (tc *AdmissionWebhookTestCase) Run(t *testing.T, scheme *runtime.Scheme, fa
 	expectConfig.AssertExpectations(t)
 }
 
-// Run executes the webhook test suite.
+// Deprecated use RunWithContext instead
 func (ts AdmissionWebhookTestSuite) Run(t *testing.T, scheme *runtime.Scheme, factory AdmissionWebhookFactory) {
+	ts.RunWithContext(t, scheme, func(t *testing.T, ctx context.Context, wtc *AdmissionWebhookTestCase, c reconcilers.Config) (*admission.Webhook, error) {
+		webhook := factory(t, wtc, c)
+		return webhook, nil
+	})
+}
+
+// Run executes the webhook test suite.
+func (ts AdmissionWebhookTestSuite) RunWithContext(t *testing.T, scheme *runtime.Scheme, factory AdmissionWebhookFactoryWithContext) {
 	t.Helper()
 	focused := AdmissionWebhookTestSuite{}
 	for _, test := range ts {
@@ -256,7 +288,7 @@ func (ts AdmissionWebhookTestSuite) Run(t *testing.T, scheme *runtime.Scheme, fa
 	for _, test := range testsToExecute {
 		t.Run(test.Name, func(t *testing.T) {
 			t.Helper()
-			test.Run(t, scheme, factory)
+			test.RunWithContext(t, scheme, factory)
 		})
 	}
 	if len(focused) > 0 {
@@ -265,3 +297,4 @@ func (ts AdmissionWebhookTestSuite) Run(t *testing.T, scheme *runtime.Scheme, fa
 }
 
 type AdmissionWebhookFactory func(t *testing.T, wtc *AdmissionWebhookTestCase, c reconcilers.Config) *admission.Webhook
+type AdmissionWebhookFactoryWithContext func(t *testing.T, ctx context.Context, wtc *AdmissionWebhookTestCase, c reconcilers.Config) (*admission.Webhook, error)

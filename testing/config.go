@@ -71,6 +71,9 @@ type ExpectConfig struct {
 	// WithReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
 	// each call to the clientset providing the ability to mutate the resource or inject an error.
 	WithReactors []ReactionFunc
+	// WithWatchReactors installs WatchReactionFunc into the fake clientset. This provides ability
+	// to simulate events in the watcher.
+	WithWatchReactors []WatchReactionFunc
 	// GivenTracks provide a set of tracked resources to seed the tracker with
 	GivenTracks []TrackRequest
 
@@ -120,6 +123,11 @@ func (c *ExpectConfig) init() {
 			// in reverse order since we prepend
 			reactor := c.WithReactors[len(c.WithReactors)-1-i]
 			c.client.PrependReactor("*", "*", reactor)
+		}
+		for i := range c.WithWatchReactors {
+			// in reverse order since we prepend
+			watchReactor := c.WithWatchReactors[len(c.WithWatchReactors)-1-i]
+			c.client.PrependWatchReactor("*", watchReactor)
 		}
 		c.apiReader = c.createClient(apiGivenObjects, c.StatusSubResourceTypes)
 		c.recorder = &eventRecorder{

@@ -257,7 +257,12 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 
 	reconcileResult, err := r.reconcileOuter(ctx, req)
 
-	return r.AfterReconcile(ctx, req, AggregateResults(beforeResult, reconcileResult), err)
+	result, err := r.AfterReconcile(ctx, req, AggregateResults(beforeResult, reconcileResult), err)
+	if errors.Is(err, ErrQuiet) {
+		// suppress error, while forcing a requeue
+		return Result{Requeue: true}, nil
+	}
+	return result, err
 }
 
 func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request) (Result, error) {
@@ -346,11 +351,11 @@ func (r *ResourceReconciler[T]) reconcileInner(ctx context.Context, resource T) 
 
 	result, err := r.Reconciler.Reconcile(ctx, resource)
 	if err != nil && !errors.Is(err, ErrHaltSubReconcilers) {
-		return Result{}, err
+		return result, err
 	}
 
 	r.copyGeneration(resource)
-	return result, nil
+	return result, err
 }
 
 func (r *ResourceReconciler[T]) initializeConditions(ctx context.Context, obj T) {

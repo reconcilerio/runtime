@@ -245,6 +245,11 @@ func (r *AggregateReconciler[T]) Reconcile(ctx context.Context, req Request) (Re
 
 	beforeCtx, beforeResult, err := r.BeforeReconcile(ctx, req)
 	if err != nil {
+		if errors.Is(err, ErrQuiet) {
+			// suppress error, while forcing a requeue
+			beforeResult = Result{Requeue: true}
+			return beforeResult, nil
+		}
 		return beforeResult, err
 	}
 	if beforeCtx != nil {
@@ -253,7 +258,13 @@ func (r *AggregateReconciler[T]) Reconcile(ctx context.Context, req Request) (Re
 
 	reconcileResult, err := r.reconcile(ctx, req)
 
-	return r.AfterReconcile(ctx, req, AggregateResults(beforeResult, reconcileResult), err)
+	result, err := r.AfterReconcile(ctx, req, AggregateResults(beforeResult, reconcileResult), err)
+	if errors.Is(err, ErrQuiet) {
+		// suppress error, while forcing a requeue
+		result = Result{Requeue: true}
+		return result, nil
+	}
+	return result, err
 }
 
 func (r *AggregateReconciler[T]) reconcile(ctx context.Context, req Request) (Result, error) {

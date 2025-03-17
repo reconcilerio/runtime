@@ -640,6 +640,7 @@ func TestResourceReconciler_Duck(t *testing.T) {
 					Patch:       []byte(`{"spec":{"fields":{"Defaulter":"ran"}},"status":{"fields":{"want":"this to run"}}}`),
 				},
 			},
+			ExpectedResult: reconcilers.Result{Requeue: true},
 		},
 		"sub reconciler halted with result": {
 			Request: testRequest,
@@ -657,7 +658,7 @@ func TestResourceReconciler_Duck(t *testing.T) {
 								resource.Status.Fields = map[string]string{
 									"want": "this to run",
 								}
-								return reconcilers.Result{Requeue: true}, reconcilers.ErrHaltSubReconcilers
+								return reconcilers.Result{RequeueAfter: 10}, reconcilers.ErrHaltSubReconcilers
 							},
 						},
 						&reconcilers.SyncReconciler[*resources.TestDuck]{
@@ -1161,6 +1162,7 @@ func TestResourceReconciler(t *testing.T) {
 					d.AddField("want", "this to run")
 				}),
 			},
+			ExpectedResult: reconcile.Result{Requeue: true},
 		},
 		"sub reconciler halted with result": {
 			Request: testRequest,
@@ -1178,7 +1180,7 @@ func TestResourceReconciler(t *testing.T) {
 								resource.Status.Fields = map[string]string{
 									"want": "this to run",
 								}
-								return reconcilers.Result{Requeue: true}, reconcilers.ErrHaltSubReconcilers
+								return reconcilers.Result{RequeueAfter: 10}, reconcilers.ErrHaltSubReconcilers
 							},
 						},
 						&reconcilers.SyncReconciler[*resources.TestResource]{

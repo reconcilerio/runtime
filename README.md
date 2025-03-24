@@ -20,6 +20,7 @@ Within an existing Kubebuilder or controller-runtime project, reconcilers.io may
 	- [Higher-order Reconcilers](#higher-order-reconcilers)
 		- [CastResource](#castresource)
 		- [Sequence](#sequence)
+		- [Always](#always)
 		- [Advice](#advice)
 		- [IfThen](#ifthen)
 		- [While](#while)
@@ -464,6 +465,12 @@ func FunctionReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*b
 }
 ```
 [full source](https://github.com/projectriff/system/blob/4c3b75327bf99cc37b57ba14df4c65d21dc79d28/pkg/controllers/build/function_reconciler.go#L39-L51)
+
+#### Always
+
+An [`Always`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Always) composes multiple `SubReconciler`s as a single `SubReconciler`. Each sub reconciler is called in turn, aggregating the result and error of each sub reconciler. `Always` only differs from [`Sequence`](#sequence) in how errors are handled. Unlike `Sequence`, an error will not interrupt the flow.
+
+The returned error joins all returned errors. It will only match `ErrQuiet` if all errors also match `ErrQuiet`.
 
 #### Advice
 

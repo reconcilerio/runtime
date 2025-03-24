@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the original author or authors.
+Copyright 2025 the original author or authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package reconcilers_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ import (
 	"reconciler.io/runtime/validation"
 )
 
-func TestSequence(t *testing.T) {
+func TestAlways(t *testing.T) {
 	testNamespace := "test-namespace"
 	testName := "test-resource"
 
@@ -52,33 +53,96 @@ func TestSequence(t *testing.T) {
 		})
 
 	rts := rtesting.SubReconcilerTests[*resources.TestResource]{
-		"sub reconciler erred": {
+		"sub reconciler erred, keeps processing": {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							Sync: func(ctx context.Context, resource *resources.TestResource) error {
 								return fmt.Errorf("reconciler error")
+							},
+						},
+						&reconcilers.SyncReconciler[*resources.TestResource]{
+							Sync: func(ctx context.Context, resource *resources.TestResource) error {
+								if resource.Status.Fields == nil {
+									resource.Status.Fields = map[string]string{}
+								}
+								resource.Status.Fields["still-running"] = "true"
+								return nil
+							},
+						},
+					}
+				},
+			},
+
+			ShouldErr: true,
+			ExpectResource: resource.
+				StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.AddField("still-running", "true")
+				}).
+				DieReleasePtr(),
+		},
+		"non-quiet errors remain non-quiet": {
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return reconcilers.Always[*resources.TestResource]{
+						&reconcilers.SyncReconciler[*resources.TestResource]{
+							Sync: func(ctx context.Context, resource *resources.TestResource) error {
+								return fmt.Errorf("not quiet")
+							},
+						}, &reconcilers.SyncReconciler[*resources.TestResource]{
+							Sync: func(ctx context.Context, resource *resources.TestResource) error {
+								return nil
 							},
 						},
 					}
 				},
 			},
 			ShouldErr: true,
+			Verify: func(t *testing.T, result reconcilers.Result, err error) {
+				if errors.Is(err, reconcilers.ErrQuiet) {
+					t.Errorf("expected returned error to not be ErrQuiet")
+				}
+			},
 		},
-		"preserves result, sub reconciler halted": {
+		"mixed quiet and non-quiet errors are not quiet": {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
+						&reconcilers.SyncReconciler[*resources.TestResource]{
+							Sync: func(ctx context.Context, resource *resources.TestResource) error {
+								return fmt.Errorf("not quiet")
+							},
+						}, &reconcilers.SyncReconciler[*resources.TestResource]{
+							Sync: func(ctx context.Context, resource *resources.TestResource) error {
+								return reconcilers.ErrHaltSubReconcilers
+							},
+						},
+					}
+				},
+			},
+			ShouldErr: true,
+			Verify: func(t *testing.T, result reconcilers.Result, err error) {
+				if errors.Is(err, reconcilers.ErrQuiet) {
+					t.Errorf("expected returned error to not be ErrQuiet")
+				}
+			},
+		},
+		"quiet errors remain quiet": {
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
-								return reconcilers.Result{RequeueAfter: 1 * time.Minute}, nil
+								return reconcilers.Result{}, reconcilers.ErrHaltSubReconcilers
 							},
 						}, &reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
-								return reconcilers.Result{RequeueAfter: 1 * time.Second}, reconcilers.ErrHaltSubReconcilers
+								return reconcilers.Result{RequeueAfter: 1 * time.Minute}, nil
 							},
 						},
 					}
@@ -86,6 +150,11 @@ func TestSequence(t *testing.T) {
 			},
 			ExpectedResult: reconcilers.Result{RequeueAfter: 1 * time.Minute},
 			ShouldErr:      true,
+			Verify: func(t *testing.T, result reconcilers.Result, err error) {
+				if !errors.Is(err, reconcilers.ErrQuiet) {
+					t.Errorf("expected returned error to be ErrQuiet")
+				}
+			},
 		},
 		"preserves result, Requeue": {
 			Resource: resource.DieReleasePtr(),
@@ -104,7 +173,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{RequeueAfter: 1 * time.Minute}, nil
@@ -119,7 +188,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{Requeue: true}, fmt.Errorf("test error")
@@ -135,7 +204,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{Requeue: true}, nil
@@ -155,7 +224,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{}, nil
@@ -175,7 +244,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{RequeueAfter: 1 * time.Minute}, nil
@@ -195,7 +264,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{}, nil
@@ -215,7 +284,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{RequeueAfter: 1 * time.Minute}, nil
@@ -235,7 +304,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{Requeue: true}, nil
@@ -255,7 +324,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{RequeueAfter: 1 * time.Minute}, nil
@@ -275,7 +344,7 @@ func TestSequence(t *testing.T) {
 			Resource: resource.DieReleasePtr(),
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
-					return reconcilers.Sequence[*resources.TestResource]{
+					return reconcilers.Always[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 								return reconcilers.Result{RequeueAfter: 2 * time.Minute}, nil
@@ -298,19 +367,19 @@ func TestSequence(t *testing.T) {
 	})
 }
 
-func TestSequence_Validate(t *testing.T) {
+func TestAlways_Validate(t *testing.T) {
 	tests := []struct {
 		name       string
-		reconciler *reconcilers.Sequence[*resources.TestResource]
+		reconciler *reconcilers.Always[*resources.TestResource]
 		shouldErr  string
 	}{
 		{
 			name:       "valid empty sequence",
-			reconciler: &reconcilers.Sequence[*resources.TestResource]{},
+			reconciler: &reconcilers.Always[*resources.TestResource]{},
 		},
 		{
 			name: "valid sequence",
-			reconciler: &reconcilers.Sequence[*resources.TestResource]{
+			reconciler: &reconcilers.Always[*resources.TestResource]{
 				&reconcilers.SyncReconciler[*resources.TestResource]{
 					Sync: func(ctx context.Context, resource *resources.TestResource) error {
 						return nil
@@ -325,7 +394,7 @@ func TestSequence_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid sequence",
-			reconciler: &reconcilers.Sequence[*resources.TestResource]{
+			reconciler: &reconcilers.Always[*resources.TestResource]{
 				&reconcilers.SyncReconciler[*resources.TestResource]{
 					Sync: func(ctx context.Context, resource *resources.TestResource) error {
 						return nil
@@ -337,7 +406,7 @@ func TestSequence_Validate(t *testing.T) {
 					// },
 				},
 			},
-			shouldErr: `Sequence must have a valid Sequence[1]: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
+			shouldErr: `Always must have a valid Always[1]: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

@@ -102,16 +102,17 @@ type ResourceReconciler[Type client.Object] struct {
 	// +optional
 	AfterReconcile func(ctx context.Context, req Request, res Result, err error) (Result, error)
 
-	// SkipResource shortcuts the reconciler for the specific request. The context and logger are
-	// initialized, but no work is preformed and the request is removed from the workqueue.
+	// SkipResource shortcuts the reconciler for the specific request. While the context and logger
+	// are initialized, no work is preformed. The request is removed from the workqueue.
 	//
 	// +optional
 	SkipRequest func(ctx context.Context, req Request) bool
 
 	// SkipResource shortcuts the reconciler for the specific resource. The Reconciler is not
-	// called and the status is not updated.
+	// called and the resource's status is not updated.
 	//
-	// BeforeReconcile and AfterReconcile are called, and the resource's defaults are applied.
+	// BeforeReconcile and AfterReconcile are called, and the resource's defaults are applied
+	// before calling this method.
 	//
 	// +optional
 	SkipResource func(ctx context.Context, resource Type) bool

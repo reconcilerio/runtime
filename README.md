@@ -87,6 +87,8 @@ The resource reconciler is responsible for:
 The implementor is responsible for:
 - defining the set of sub reconcilers
 
+The processing of a specific request or resource may be skipped by implementing and returning `true` from either [`SkipRequest`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceReconciler.SkipRequest), or [`SkipResource`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ResourceReconciler.SkipResource) respectively.
+
 **Example:**
 
 Resource reconcilers tend to be quite simple, as they delegate their work to sub reconcilers. We'll use an example from projectriff of the Function resource, which uses Kpack to build images from a git repo. In this case the `FunctionTargetImageReconciler` resolves the target image for the function, and `FunctionChildImageReconciler` creates a child Kpack Image resource based on the resolve value. 

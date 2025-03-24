@@ -108,7 +108,7 @@ type ResourceReconciler[Type client.Object] struct {
 	// +optional
 	SkipRequest func(ctx context.Context, req Request) bool
 
-	// SkipResource short cuts the reconciler for the specific resource. The Reconciler is not be
+	// SkipResource shortcuts the reconciler for the specific resource. The Reconciler is not
 	// called and the status is not updated.
 	//
 	// BeforeReconcile and AfterReconcile are called, and the resource's defaults are applied.

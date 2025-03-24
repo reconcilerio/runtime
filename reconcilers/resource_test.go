@@ -1487,6 +1487,50 @@ func TestResourceReconciler(t *testing.T) {
 				},
 			},
 		},
+		"skip request": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			Metadata: map[string]interface{}{
+				"SkipRequest": func(ctx context.Context, req reconcilers.Request) bool {
+					return req.Name == testRequest.Name && req.Namespace == testRequest.Namespace
+				},
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							t.Fatalf("reconcile should have been skipped")
+							return nil
+						},
+					}
+				},
+			},
+		},
+		"skip resource": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			Metadata: map[string]interface{}{
+				"SkipResource": func(ctx context.Context, resource *resources.TestResource) bool {
+					return resource.Name == givenResource.GetName() && resource.Namespace == givenResource.GetNamespace()
+				},
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							t.Fatalf("reconcile should have been skipped")
+							return nil
+						},
+					}
+				},
+			},
+		},
 	}
 
 	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.ReconcilerTestCase, c reconcilers.Config) reconcile.Reconciler {
@@ -1506,12 +1550,22 @@ func TestResourceReconciler(t *testing.T) {
 		if after, ok := rtc.Metadata["AfterReconcile"].(func(context.Context, reconcilers.Request, reconcilers.Result, error) (reconcilers.Result, error)); ok {
 			afterReconcile = after
 		}
+		var skipRequest func(context.Context, reconcilers.Request) bool
+		if skip, ok := rtc.Metadata["SkipRequest"].(func(context.Context, reconcilers.Request) bool); ok {
+			skipRequest = skip
+		}
+		var skipResource func(context.Context, *resources.TestResource) bool
+		if skip, ok := rtc.Metadata["SkipResource"].(func(context.Context, *resources.TestResource) bool); ok {
+			skipResource = skip
+		}
 		return &reconcilers.ResourceReconciler[*resources.TestResource]{
 			Reconciler:                   rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource])(t, c),
 			SkipStatusUpdate:             skipStatusUpdate,
 			SyncStatusDuringFinalization: syncStatusDuringFinalization,
 			BeforeReconcile:              beforeReconcile,
 			AfterReconcile:               afterReconcile,
+			SkipRequest:                  skipRequest,
+			SkipResource:                 skipResource,
 			Config:                       c,
 		}
 	})

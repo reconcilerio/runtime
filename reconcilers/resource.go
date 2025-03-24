@@ -102,6 +102,21 @@ type ResourceReconciler[Type client.Object] struct {
 	// +optional
 	AfterReconcile func(ctx context.Context, req Request, res Result, err error) (Result, error)
 
+	// SkipResource shortcuts the reconciler for the specific request. While the context and logger
+	// are initialized, no work is preformed. The request is removed from the workqueue.
+	//
+	// +optional
+	SkipRequest func(ctx context.Context, req Request) bool
+
+	// SkipResource shortcuts the reconciler for the specific resource. The Reconciler is not
+	// called and the resource's status is not updated.
+	//
+	// BeforeReconcile and AfterReconcile are called, and the resource's defaults are applied
+	// before calling this method.
+	//
+	// +optional
+	SkipResource func(ctx context.Context, resource Type) bool
+
 	Config Config
 
 	lazyInit sync.Once
@@ -124,6 +139,16 @@ func (r *ResourceReconciler[T]) init() {
 		if r.AfterReconcile == nil {
 			r.AfterReconcile = func(ctx context.Context, req reconcile.Request, res reconcile.Result, err error) (reconcile.Result, error) {
 				return res, err
+			}
+		}
+		if r.SkipRequest == nil {
+			r.SkipRequest = func(ctx context.Context, req reconcile.Request) bool {
+				return false
+			}
+		}
+		if r.SkipResource == nil {
+			r.SkipResource = func(ctx context.Context, resource T) bool {
+				return false
 			}
 		}
 	})
@@ -247,6 +272,10 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 	ctx = StashOriginalResourceType(ctx, r.Type)
 	ctx = StashResourceType(ctx, r.Type)
 
+	if r.SkipRequest(ctx, req) {
+		return Result{}, nil
+	}
+
 	beforeCtx, beforeResult, err := r.BeforeReconcile(ctx, req)
 	if err != nil {
 		return beforeResult, err
@@ -294,6 +323,10 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 	} else if defaulter, ok := client.Object(resource).(objectDefaulter); ok {
 		// resource.Default()
 		defaulter.Default()
+	}
+
+	if r.SkipResource(ctx, resource) {
+		return Result{}, nil
 	}
 
 	r.initializeConditions(ctx, resource)

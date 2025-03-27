@@ -640,54 +640,6 @@ func TestResourceReconciler_Duck(t *testing.T) {
 					Patch:       []byte(`{"spec":{"fields":{"Defaulter":"ran"}},"status":{"fields":{"want":"this to run"}}}`),
 				},
 			},
-			ExpectedResult: reconcilers.Result{Requeue: true},
-		},
-		"sub reconciler halted with result": {
-			Request: testRequest,
-			StatusSubResourceTypes: []client.Object{
-				&resources.TestResource{},
-			},
-			GivenObjects: []client.Object{
-				resource,
-			},
-			Metadata: map[string]interface{}{
-				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck] {
-					return reconcilers.Sequence[*resources.TestDuck]{
-						&reconcilers.SyncReconciler[*resources.TestDuck]{
-							SyncWithResult: func(ctx context.Context, resource *resources.TestDuck) (reconcilers.Result, error) {
-								resource.Status.Fields = map[string]string{
-									"want": "this to run",
-								}
-								return reconcilers.Result{RequeueAfter: 10}, reconcilers.ErrHaltSubReconcilers
-							},
-						},
-						&reconcilers.SyncReconciler[*resources.TestDuck]{
-							Sync: func(ctx context.Context, resource *resources.TestDuck) error {
-								resource.Status.Fields = map[string]string{
-									"don't want": "this to run",
-								}
-								return fmt.Errorf("reconciler error")
-							},
-						},
-					}
-				},
-			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "StatusPatched",
-					`Patched status`),
-			},
-			ExpectStatusPatches: []rtesting.PatchRef{
-				{
-					Group:       "testing.reconciler.runtime",
-					Kind:        "TestResource",
-					Namespace:   resource.GetNamespace(),
-					Name:        resource.GetName(),
-					SubResource: "status",
-					PatchType:   types.MergePatchType,
-					Patch:       []byte(`{"spec":{"fields":{"Defaulter":"ran"}},"status":{"fields":{"want":"this to run"}}}`),
-				},
-			},
-			ExpectedResult: reconcilers.Result{Requeue: true},
 		},
 		"status patch failed": {
 			Request: testRequest,
@@ -1006,12 +958,13 @@ func TestResourceReconciler(t *testing.T) {
 			Metadata: map[string]interface{}{
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 					return &reconcilers.SyncReconciler[*resources.TestResource]{
-						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+						SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
 							if resource.Status.Fields == nil {
 								resource.Status.Fields = map[string]string{}
 							}
 							resource.Status.Fields["Reconciler"] = "ran"
-							return nil
+							// the result is ignored because the status is updated
+							return reconcilers.Result{RequeueAfter: 10}, nil
 						},
 					}
 				},
@@ -1136,17 +1089,15 @@ func TestResourceReconciler(t *testing.T) {
 					return reconcilers.Sequence[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							Sync: func(ctx context.Context, resource *resources.TestResource) error {
-								resource.Status.Fields = map[string]string{
-									"want": "this to run",
-								}
+								c := reconcilers.RetrieveConfigOrDie(ctx)
+								c.Recorder.Eventf(resource, corev1.EventTypeNormal, "Want", "")
 								return reconcilers.ErrHaltSubReconcilers
 							},
 						},
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							Sync: func(ctx context.Context, resource *resources.TestResource) error {
-								resource.Status.Fields = map[string]string{
-									"don't want": "this to run",
-								}
+								c := reconcilers.RetrieveConfigOrDie(ctx)
+								c.Recorder.Eventf(resource, corev1.EventTypeNormal, "DontWant", "")
 								return fmt.Errorf("reconciler error")
 							},
 						},
@@ -1154,17 +1105,11 @@ func TestResourceReconciler(t *testing.T) {
 				},
 			},
 			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
-					`Updated status`),
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "Want", ""),
 			},
-			ExpectStatusUpdates: []client.Object{
-				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("want", "this to run")
-				}),
-			},
-			ExpectedResult: reconcile.Result{Requeue: true},
+			ExpectedResult: reconcilers.Result{Requeue: true},
 		},
-		"sub reconciler halted with result": {
+		"skip status update": {
 			Request: testRequest,
 			StatusSubResourceTypes: []client.Object{
 				&resources.TestResource{},
@@ -1176,32 +1121,39 @@ func TestResourceReconciler(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 					return reconcilers.Sequence[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
-							SyncWithResult: func(ctx context.Context, resource *resources.TestResource) (reconcilers.Result, error) {
+							Sync: func(ctx context.Context, resource *resources.TestResource) error {
 								resource.Status.Fields = map[string]string{
 									"want": "this to run",
 								}
-								return reconcilers.Result{RequeueAfter: 10}, reconcilers.ErrHaltSubReconcilers
-							},
-						},
-						&reconcilers.SyncReconciler[*resources.TestResource]{
-							Sync: func(ctx context.Context, resource *resources.TestResource) error {
-								resource.Status.Fields = map[string]string{
-									"don't want": "this to run",
-								}
-								return fmt.Errorf("reconciler error")
+								return reconcilers.ErrSkipStatusUpdate
 							},
 						},
 					}
 				},
 			},
-			ExpectEvents: []rtesting.Event{
-				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
-					`Updated status`),
+			ShouldErr: true,
+		},
+		"skip status update quietly, auto requeues": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
 			},
-			ExpectStatusUpdates: []client.Object{
-				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
-					d.AddField("want", "this to run")
-				}),
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return reconcilers.Sequence[*resources.TestResource]{
+						&reconcilers.SyncReconciler[*resources.TestResource]{
+							Sync: func(ctx context.Context, resource *resources.TestResource) error {
+								resource.Status.Fields = map[string]string{
+									"want": "this to run",
+								}
+								return errors.Join(reconcilers.ErrSkipStatusUpdate, reconcilers.ErrQuiet)
+							},
+						},
+					}
+				},
 			},
 			ExpectedResult: reconcilers.Result{Requeue: true},
 		},

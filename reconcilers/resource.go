@@ -46,6 +46,14 @@ import (
 
 var _ reconcile.Reconciler = (*ResourceReconciler[client.Object])(nil)
 
+// ErrSkipStatusUpdate indicates the ResourceReconciler should not update the status for the
+// resource in this request, even if it has changed.
+//
+// This error should often be combined with ErrQuiet to avoid being logged:
+//
+//	errors.Join(ErrSkipStatusUpdate, ErrQuiet)
+var ErrSkipStatusUpdate = errors.New("skip ResourceReconciler status update for this request")
+
 // ResourceReconciler is a controller-runtime reconciler that reconciles a given
 // existing resource. The Type resource is fetched for the reconciler
 // request and passed in turn to each SubReconciler. Finally, the reconciled
@@ -341,7 +349,7 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 
 	// check if status has changed before updating
 	resourceStatus, originalResourceStatus := r.status(resource), r.status(originalResource)
-	if !equality.Semantic.DeepEqual(resourceStatus, originalResourceStatus) && (resource.GetDeletionTimestamp() == nil || r.SyncStatusDuringFinalization) {
+	if !errors.Is(err, ErrSkipStatusUpdate) && !equality.Semantic.DeepEqual(resourceStatus, originalResourceStatus) && (resource.GetDeletionTimestamp() == nil || r.SyncStatusDuringFinalization) {
 		if duck.IsDuck(resource, c.Scheme()) {
 			// patch status
 			log.Info("patching status", "diff", cmp.Diff(originalResourceStatus, resourceStatus, IgnoreAllUnexported))
@@ -370,6 +378,10 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 			c.Recorder.Eventf(resource, corev1.EventTypeNormal, "StatusUpdated",
 				"Updated status")
 		}
+
+		// Suppress result. Let the informer discover the resource mutation and requeue. Requeueing
+		// now may result in re-processing a stale cache.
+		return Result{}, nil
 	}
 
 	// return original reconcile result

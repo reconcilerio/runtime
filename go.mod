@@ -2,8 +2,6 @@ module reconciler.io/runtime
 
 go 1.23.0
 
-toolchain go1.24.1
-
 require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/fatih/color v1.18.0

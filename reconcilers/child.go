@@ -102,6 +102,10 @@ type ChildReconciler[Type, ChildType client.Object, ChildListType client.ObjectL
 	// handling an unknown error reason.
 	ReflectChildStatusOnParent func(ctx context.Context, parent Type, child ChildType, err error)
 
+	// ReflectChildStatusOnParentWithError is equivalent to ReflectChildStatusOnParent, but also
+	// able to return an error.
+	ReflectChildStatusOnParentWithError func(ctx context.Context, parent Type, child ChildType, err error) error
+
 	// ReflectedChildErrorReasons are client errors when managing the child resource that are handled by
 	// ReflectChildStatusOnParent. Error reasons not listed are returned directly from the
 	// ChildReconciler as an error so that the reconcile request can be retried.
@@ -165,6 +169,12 @@ func (r *ChildReconciler[T, CT, CLT]) init() {
 				metav1.StatusReasonInvalid,
 			}
 		}
+		if r.ReflectChildStatusOnParentWithError == nil && r.ReflectChildStatusOnParent != nil {
+			r.ReflectChildStatusOnParentWithError = func(ctx context.Context, parent T, child CT, err error) error {
+				r.ReflectChildStatusOnParent(ctx, parent, child, err)
+				return nil
+			}
+		}
 	})
 }
 
@@ -208,9 +218,9 @@ func (r *ChildReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
 		return fmt.Errorf("ChildReconciler %q must implement DesiredChild", r.Name)
 	}
 
-	// require ReflectChildStatusOnParent
-	if r.ReflectChildStatusOnParent == nil {
-		return fmt.Errorf("ChildReconciler %q must implement ReflectChildStatusOnParent", r.Name)
+	// require ReflectChildStatusOnParent or ReflectChildStatusOnParentWithError
+	if r.ReflectChildStatusOnParent == nil && r.ReflectChildStatusOnParentWithError == nil {
+		return fmt.Errorf("ChildReconciler %q must implement ReflectChildStatusOnParent or ReflectChildStatusOnParentWithError", r.Name)
 	}
 
 	if r.OurChild == nil && r.SkipOwnerReference {
@@ -265,13 +275,19 @@ func (r *ChildReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource T)
 				}
 			}
 
-			r.ReflectChildStatusOnParent(ctx, resource, child, err)
+			if err := r.ReflectChildStatusOnParentWithError(ctx, resource, child, err); err != nil {
+				return Result{}, err
+			}
+
 			return Result{}, nil
 		}
 
 		return Result{}, err
 	}
-	r.ReflectChildStatusOnParent(ctx, resource, child, nil)
+
+	if err := r.ReflectChildStatusOnParentWithError(ctx, resource, child, nil); err != nil {
+		return Result{}, err
+	}
 
 	return Result{}, nil
 }

@@ -1187,6 +1187,19 @@ func TestChildReconciler_Validate(t *testing.T) {
 			},
 		},
 		{
+			name:   "valid, ReflectChildStatusOnParentWithError",
+			parent: &corev1.ConfigMap{},
+			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
+				ChildType:     &corev1.Pod{},
+				ChildListType: &corev1.PodList{},
+				DesiredChild:  func(ctx context.Context, parent *corev1.ConfigMap) (*corev1.Pod, error) { return nil, nil },
+				ChildObjectManager: &reconcilers.UpdatingObjectManager[*corev1.Pod]{
+					MergeBeforeUpdate: func(current, desired *corev1.Pod) {},
+				},
+				ReflectChildStatusOnParentWithError: func(ctx context.Context, parent *corev1.ConfigMap, child *corev1.Pod, err error) error { return nil },
+			},
+		},
+		{
 			name:   "ChildType missing",
 			parent: &corev1.ConfigMap{},
 			reconciler: &reconcilers.ChildReconciler[*corev1.ConfigMap, *corev1.Pod, *corev1.PodList]{
@@ -1242,7 +1255,7 @@ func TestChildReconciler_Validate(t *testing.T) {
 				},
 				// ReflectChildStatusOnParent: func(parent *corev1.ConfigMap, child *corev1.Pod, err error) {},
 			},
-			shouldErr: `ChildReconciler "ReflectChildStatusOnParent missing" must implement ReflectChildStatusOnParent`,
+			shouldErr: `ChildReconciler "ReflectChildStatusOnParent missing" must implement ReflectChildStatusOnParent or ReflectChildStatusOnParentWithError`,
 		},
 		{
 			name:   "ListOptions",

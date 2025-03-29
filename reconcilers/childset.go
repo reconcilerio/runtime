@@ -117,6 +117,10 @@ type ChildSetReconciler[Type, ChildType client.Object, ChildListType client.Obje
 	// reconciled, (sorted by identifier).
 	ReflectChildrenStatusOnParent func(ctx context.Context, parent Type, result ChildSetResult[ChildType])
 
+	// ReflectChildrenStatusOnParentWithError is equivalent to ReflectChildrenStatusOnParent, but
+	// also able to return an error.
+	ReflectChildrenStatusOnParentWithError func(ctx context.Context, parent Type, result ChildSetResult[ChildType]) error
+
 	// ReflectedChildErrorReasons are client errors when managing the child resource that are
 	// handled by ReflectChildrenStatusOnParent. Error reasons not listed are returned directly
 	// from the ChildSetReconciler as an error so that the reconcile request can be retried.
@@ -180,6 +184,12 @@ func (r *ChildSetReconciler[T, CT, CLT]) init() {
 			r.Name = fmt.Sprintf("%sChildSetReconciler", typeName(r.ChildType))
 		}
 		r.voidReconciler = r.childReconcilerFor(nilCT, nil, "", true)
+		if r.ReflectChildrenStatusOnParentWithError == nil && r.ReflectChildrenStatusOnParent != nil {
+			r.ReflectChildrenStatusOnParentWithError = func(ctx context.Context, parent T, result ChildSetResult[CT]) error {
+				r.ReflectChildrenStatusOnParent(ctx, parent, result)
+				return nil
+			}
+		}
 	})
 }
 
@@ -257,9 +267,9 @@ func (r *ChildSetReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
 		return fmt.Errorf("ChildSetReconciler %q must implement DesiredChildren", r.Name)
 	}
 
-	// require ReflectChildrenStatusOnParent
-	if r.ReflectChildrenStatusOnParent == nil {
-		return fmt.Errorf("ChildSetReconciler %q must implement ReflectChildrenStatusOnParent", r.Name)
+	// require ReflectChildrenStatusOnParent or ReflectChildrenStatusOnParentWithError
+	if r.ReflectChildrenStatusOnParent == nil && r.ReflectChildrenStatusOnParentWithError == nil {
+		return fmt.Errorf("ChildSetReconciler %q must implement ReflectChildrenStatusOnParent or ReflectChildrenStatusOnParentWithError", r.Name)
 	}
 
 	if r.OurChild == nil && r.SkipOwnerReference {
@@ -302,9 +312,9 @@ func (r *ChildSetReconciler[T, CT, CLT]) Reconcile(ctx context.Context, resource
 	if err != nil {
 		return Result{}, err
 	}
-	result, err := cr.Reconcile(ctx, resource)
-	r.reflectStatus(ctx, resource)
-	return result, err
+	result, reconcileErr := cr.Reconcile(ctx, resource)
+	reflectStatusErr := r.reflectStatus(ctx, resource)
+	return result, errors.Join(reconcileErr, reflectStatusErr)
 }
 
 func (r *ChildSetReconciler[T, CT, CLT]) knownChildren(ctx context.Context, resource T) ([]CT, error) {
@@ -366,9 +376,9 @@ func (r *ChildSetReconciler[T, CT, CLT]) composeChildReconcilers(ctx context.Con
 	return sequence, nil
 }
 
-func (r *ChildSetReconciler[T, CT, CLT]) reflectStatus(ctx context.Context, parent T) {
+func (r *ChildSetReconciler[T, CT, CLT]) reflectStatus(ctx context.Context, parent T) error {
 	result := childSetResultStasher[CT]().Clear(ctx)
-	r.ReflectChildrenStatusOnParent(ctx, parent, result)
+	return r.ReflectChildrenStatusOnParentWithError(ctx, parent, result)
 }
 
 type ChildSetResult[T client.Object] struct {
@@ -395,9 +405,9 @@ func childSetResultStasher[T client.Object]() Stasher[ChildSetResult[T]] {
 
 const knownChildrenStashKey StashKey = "reconciler.io/runtime:knownChildren"
 
-// RetrieveKnownChildren returns the children managed by current ChildSetReconciler. The known
-// children can be returned from the DesiredChildren method to preserve existing children, or to
-// mutate/delete an existing child.
+// RetrieveKnownChildren returns a copy of the children managed by current ChildSetReconciler. The
+// known children can be returned from the DesiredChildren method to preserve existing children, or
+// to mutate/delete an existing child.
 //
 // For example, a child stamper could be implemented by returning existing children from
 // DesiredChildren and appending an addition child when a new resource should be created. Likewise
@@ -405,7 +415,11 @@ const knownChildrenStashKey StashKey = "reconciler.io/runtime:knownChildren"
 func RetrieveKnownChildren[T client.Object](ctx context.Context) []T {
 	value := ctx.Value(knownChildrenStashKey)
 	if result, ok := value.([]T); ok {
-		return result
+		r := make([]T, len(result))
+		for i := range result {
+			r[i] = result[i].DeepCopyObject().(T)
+		}
+		return r
 	}
 	return nil
 }

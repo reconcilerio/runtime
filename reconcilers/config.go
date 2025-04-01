@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -44,6 +45,7 @@ import (
 type Config struct {
 	client.Client
 	APIReader client.Reader
+	Discovery discovery.DiscoveryInterface
 	Recorder  record.EventRecorder
 	Tracker   tracker.Tracker
 }
@@ -57,6 +59,7 @@ func (c Config) WithCluster(cluster cluster.Cluster) Config {
 	return Config{
 		Client:    duck.NewDuckAwareClientWrapper(cluster.GetClient()),
 		APIReader: duck.NewDuckAwareAPIReaderWrapper(cluster.GetAPIReader(), cluster.GetClient()),
+		Discovery: discovery.NewDiscoveryClientForConfigOrDie(cluster.GetConfig()),
 		Recorder:  cluster.GetEventRecorderFor("controller"),
 		Tracker:   c.Tracker,
 	}

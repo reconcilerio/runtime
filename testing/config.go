@@ -23,10 +23,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/utils/ptr"
@@ -71,6 +73,8 @@ type ExpectConfig struct {
 	// WithReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
 	// each call to the clientset providing the ability to mutate the resource or inject an error.
 	WithReactors []ReactionFunc
+	// GivenDiscoveryResources populates the fake discovery client
+	GivenDiscoveryResources []*metav1.APIResourceList
 	// GivenTracks provide a set of tracked resources to seed the tracker with
 	GivenTracks []TrackRequest
 
@@ -98,6 +102,7 @@ type ExpectConfig struct {
 	once           sync.Once
 	client         *clientWrapper
 	apiReader      *clientWrapper
+	discovery      *fakediscovery.FakeDiscovery
 	recorder       *eventRecorder
 	tracker        *mockTracker
 	observedErrors []string
@@ -122,6 +127,11 @@ func (c *ExpectConfig) init() {
 			c.client.PrependReactor("*", "*", reactor)
 		}
 		c.apiReader = c.createClient(apiGivenObjects, c.StatusSubResourceTypes)
+		c.discovery = &fakediscovery.FakeDiscovery{
+			Fake: &clientgotesting.Fake{
+				Resources: c.GivenDiscoveryResources,
+			},
+		}
 		c.recorder = &eventRecorder{
 			events: []Event{},
 			scheme: c.Scheme,
@@ -163,6 +173,7 @@ func (c *ExpectConfig) Config() reconcilers.Config {
 	return reconcilers.Config{
 		Client:    c.client,
 		APIReader: c.apiReader,
+		Discovery: c.discovery,
 		Recorder:  c.recorder,
 		Tracker:   c.tracker,
 	}

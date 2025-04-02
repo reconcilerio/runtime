@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/testr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,6 +72,8 @@ type SubReconcilerTestCase[Type client.Object] struct {
 	GivenObjects []client.Object
 	// APIGivenObjects contains objects that are only available via an API reader instead of the normal cache
 	APIGivenObjects []client.Object
+	// GivenAPIResources populates the fake discovery client and RESTMapper
+	GivenAPIResources []*metav1.APIResourceList
 	// GivenTracks provide a set of tracked resources to seed the tracker with
 	GivenTracks []TrackRequest
 
@@ -221,6 +224,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		APIGivenObjects:         append(tc.APIGivenObjects, givenResource),
 		WithClientBuilder:       tc.WithClientBuilder,
 		WithReactors:            tc.WithReactors,
+		GivenAPIResources:       tc.GivenAPIResources,
 		GivenTracks:             tc.GivenTracks,
 		ExpectTracks:            tc.ExpectTracks,
 		ExpectEvents:            tc.ExpectEvents,

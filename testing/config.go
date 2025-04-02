@@ -23,11 +23,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientgotesting "k8s.io/client-go/testing"
@@ -73,8 +76,8 @@ type ExpectConfig struct {
 	// WithReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
 	// each call to the clientset providing the ability to mutate the resource or inject an error.
 	WithReactors []ReactionFunc
-	// GivenDiscoveryResources populates the fake discovery client
-	GivenDiscoveryResources []*metav1.APIResourceList
+	// GivenAPIResources populates the fake discovery client and RESTMapper
+	GivenAPIResources []*metav1.APIResourceList
 	// GivenTracks provide a set of tracked resources to seed the tracker with
 	GivenTracks []TrackRequest
 
@@ -119,17 +122,34 @@ func (c *ExpectConfig) init() {
 		for i := range c.APIGivenObjects {
 			apiGivenObjects[i] = c.APIGivenObjects[i].DeepCopyObject().(client.Object)
 		}
+		restMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{})
+		for _, resources := range c.GivenAPIResources {
+			if resources == nil {
+				continue
+			}
+			for _, resource := range resources.APIResources {
+				kind := schema.GroupVersionKind{Group: resource.Group, Version: resource.Version, Kind: resource.Kind}
+				singular := kind.GroupVersion().WithResource(resource.SingularName)
+				plural := kind.GroupVersion().WithResource(resource.Name)
+				scope := meta.RESTScopeRoot
+				if resource.Namespaced {
+					scope = meta.RESTScopeNamespace
+				}
+				restMapper.AddSpecific(kind, plural, singular, scope)
+			}
+		}
 
-		c.client = c.createClient(givenObjects, c.StatusSubResourceTypes)
+		c.client = c.createClient(givenObjects, c.StatusSubResourceTypes, restMapper)
 		for i := range c.WithReactors {
 			// in reverse order since we prepend
 			reactor := c.WithReactors[len(c.WithReactors)-1-i]
 			c.client.PrependReactor("*", "*", reactor)
 		}
-		c.apiReader = c.createClient(apiGivenObjects, c.StatusSubResourceTypes)
+		c.apiReader = c.createClient(apiGivenObjects, c.StatusSubResourceTypes, restMapper)
 		c.discovery = &fakediscovery.FakeDiscovery{
+			FakedServerVersion: &version.Info{},
 			Fake: &clientgotesting.Fake{
-				Resources: c.GivenDiscoveryResources,
+				Resources: c.GivenAPIResources,
 			},
 		}
 		c.recorder = &eventRecorder{
@@ -151,7 +171,7 @@ func (c *ExpectConfig) configNameMsg() string {
 	return fmt.Sprintf(" for config %q", c.Name)
 }
 
-func (c *ExpectConfig) createClient(objs []client.Object, statusSubResourceTypes []client.Object) *clientWrapper {
+func (c *ExpectConfig) createClient(objs []client.Object, statusSubResourceTypes []client.Object, restMapper meta.RESTMapper) *clientWrapper {
 	tracker := clientgotesting.NewObjectTracker(c.Scheme, scheme.Codecs.UniversalDecoder())
 
 	builder := fake.NewClientBuilder()
@@ -162,6 +182,7 @@ func (c *ExpectConfig) createClient(objs []client.Object, statusSubResourceTypes
 	if c.WithClientBuilder != nil {
 		builder = c.WithClientBuilder(builder)
 	}
+	builder.WithRESTMapper(restMapper)
 
 	return NewFakeClientWrapper(duck.NewDuckAwareClientWrapper(builder.Build()), tracker)
 }

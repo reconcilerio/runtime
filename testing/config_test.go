@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
@@ -174,6 +175,47 @@ func TestExpectConfig(t *testing.T) {
 				}
 			},
 			failedAssertions: []string{},
+		},
+
+		"given apiresources": {
+			config: ExpectConfig{
+				GivenAPIResources: []*metav1.APIResourceList{
+					{
+						TypeMeta:     metav1.TypeMeta{APIVersion: "testing.reconciler.runtime/v1"},
+						GroupVersion: "testing.reconciler.runtime/v1",
+						APIResources: []metav1.APIResource{
+							{
+								Name:         "testresources",
+								SingularName: "testresource",
+								Namespaced:   true,
+								Group:        "testing.reconciler.runtime",
+								Version:      "v1",
+								Kind:         "TestResource",
+							},
+						},
+					},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				gvk, err := c.RESTMapper().KindFor(schema.GroupVersionResource{Group: "testing.reconciler.runtime", Version: "v1", Resource: "testresources"})
+				if err != nil {
+					t.Fatalf("unexpected error from KindFor: %s", err)
+				}
+				if expected, actual := "TestResource", gvk.Kind; expected != actual {
+					t.Errorf("unexpected kind: expected %q, actual %q", expected, actual)
+				}
+
+				resources, err := c.Discovery.ServerResourcesForGroupVersion("testing.reconciler.runtime/v1")
+				if err != nil {
+					t.Fatalf("unexpected error from ServerResourcesForGroupVersion: %s", err)
+				}
+				if expected, actual := 1, len(resources.APIResources); expected != actual {
+					t.Errorf("unexpected APIResources length: expected %q, actual %q", expected, actual)
+				}
+				if expected, actual := "TestResource", resources.APIResources[0].Kind; expected != actual {
+					t.Errorf("unexpected kind: expected %q, actual %q", expected, actual)
+				}
+			},
 		},
 
 		"given track": {

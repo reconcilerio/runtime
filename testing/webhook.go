@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/testr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/reconcilers"
 	rtime "reconciler.io/runtime/time"
@@ -70,6 +71,8 @@ type AdmissionWebhookTestCase struct {
 	GivenObjects []client.Object
 	// APIGivenObjects contains objects that are only available via an API reader instead of the normal cache
 	APIGivenObjects []client.Object
+	// GivenAPIResources populates the fake discovery client and RESTMapper
+	GivenAPIResources []*metav1.APIResourceList
 	// GivenTracks provide a set of tracked resources to seed the tracker with
 	GivenTracks []TrackRequest
 
@@ -207,6 +210,7 @@ func (tc *AdmissionWebhookTestCase) RunWithContext(t *testing.T, scheme *runtime
 		APIGivenObjects:         tc.APIGivenObjects,
 		WithClientBuilder:       tc.WithClientBuilder,
 		WithReactors:            tc.WithReactors,
+		GivenAPIResources:       tc.GivenAPIResources,
 		GivenTracks:             tc.GivenTracks,
 		ExpectTracks:            tc.ExpectTracks,
 		ExpectEvents:            tc.ExpectEvents,

@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -177,14 +178,30 @@ func (c *ExpectConfig) createClient(objs []client.Object, statusSubResourceTypes
 	builder := fake.NewClientBuilder()
 	builder.WithObjectTracker(tracker)
 	builder.WithScheme(c.Scheme)
-	builder.WithStatusSubresource(statusSubResourceTypes...)
-	builder.WithObjects(prepareObjects(objs)...)
+	builder.WithStatusSubresource(c.normalizeDucks(statusSubResourceTypes)...)
+	builder.WithObjects(prepareObjects(c.normalizeDucks(objs))...)
 	if c.WithClientBuilder != nil {
 		builder = c.WithClientBuilder(builder)
 	}
 	builder.WithRESTMapper(restMapper)
 
 	return NewFakeClientWrapper(duck.NewDuckAwareClientWrapper(builder.Build()), tracker)
+}
+
+func (c *ExpectConfig) normalizeDucks(objs []client.Object) []client.Object {
+	normalized := []client.Object{}
+	for _, obj := range objs {
+		if duck.IsDuck(obj, c.Scheme) {
+			u := &unstructured.Unstructured{}
+			if err := duck.Convert(obj, u); err != nil {
+				panic(err)
+			}
+			normalized = append(normalized, u)
+		} else {
+			normalized = append(normalized, obj)
+		}
+	}
+	return normalized
 }
 
 // Config returns the Config object. This method should only be called once. Subsequent calls are

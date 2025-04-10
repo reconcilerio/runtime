@@ -25,10 +25,14 @@ import (
 	"github.com/go-logr/logr"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"reconciler.io/runtime/internal"
 )
@@ -339,7 +343,7 @@ func (r *ChildReconciler[T, CT, CLT]) reconcile(ctx context.Context, resource T)
 	}
 	if !internal.IsNil(desired) {
 		if !r.SkipOwnerReference && metav1.GetControllerOfNoCopy(desired) == nil {
-			if err := ctrl.SetControllerReference(resource, desired, c.Scheme()); err != nil {
+			if err := r.setControllerReference(ctx, resource, desired); err != nil {
 				return nilCT, err
 			}
 		}
@@ -391,4 +395,97 @@ func (r *ChildReconciler[T, CT, CLT]) ourChild(resource T, obj CT) bool {
 		return true
 	}
 	return r.OurChild(resource, obj)
+}
+
+// From controller-runtime, modified to support duck types
+func (r *ChildReconciler[T, CT, CLT]) setControllerReference(ctx context.Context, owner, controlled metav1.Object, opts ...controllerutil.OwnerReferenceOption) error {
+	// Validate the owner.
+	ro, ok := owner.(runtime.Object)
+	if !ok {
+		return fmt.Errorf("%T is not a runtime.Object, cannot call SetControllerReference", owner)
+	}
+	if err := r.validateOwner(owner, controlled); err != nil {
+		return err
+	}
+
+	// Create a new controller ref.
+	gvk, err := RetrieveConfigOrDie(ctx).GroupVersionKindFor(ro)
+	if err != nil {
+		return err
+	}
+	ref := metav1.OwnerReference{
+		APIVersion:         gvk.GroupVersion().String(),
+		Kind:               gvk.Kind,
+		Name:               owner.GetName(),
+		UID:                owner.GetUID(),
+		BlockOwnerDeletion: ptr.To(true),
+		Controller:         ptr.To(true),
+	}
+	for _, opt := range opts {
+		opt(&ref)
+	}
+
+	// Return early with an error if the object is already controlled.
+	if existing := metav1.GetControllerOf(controlled); existing != nil && !r.referSameObject(*existing, ref) {
+		return r.newAlreadyOwnedError(controlled, *existing)
+	}
+
+	// Update owner references and return.
+	r.upsertOwnerRef(ref, controlled)
+	return nil
+}
+
+func (r *ChildReconciler[T, CT, CLT]) upsertOwnerRef(ref metav1.OwnerReference, object metav1.Object) {
+	owners := object.GetOwnerReferences()
+	if idx := r.indexOwnerRef(owners, ref); idx == -1 {
+		owners = append(owners, ref)
+	} else {
+		owners[idx] = ref
+	}
+	object.SetOwnerReferences(owners)
+}
+
+// indexOwnerRef returns the index of the owner reference in the slice if found, or -1.
+func (r *ChildReconciler[T, CT, CLT]) indexOwnerRef(ownerReferences []metav1.OwnerReference, ref metav1.OwnerReference) int {
+	for index, o := range ownerReferences {
+		if r.referSameObject(o, ref) {
+			return index
+		}
+	}
+	return -1
+}
+
+func (r *ChildReconciler[T, CT, CLT]) validateOwner(owner, object metav1.Object) error {
+	ownerNs := owner.GetNamespace()
+	if ownerNs != "" {
+		objNs := object.GetNamespace()
+		if objNs == "" {
+			return fmt.Errorf("cluster-scoped resource must not have a namespace-scoped owner, owner's namespace %s", ownerNs)
+		}
+		if ownerNs != objNs {
+			return fmt.Errorf("cross-namespace owner references are disallowed, owner's namespace %s, obj's namespace %s", owner.GetNamespace(), object.GetNamespace())
+		}
+	}
+	return nil
+}
+
+// Returns true if a and b point to the same object.
+func (r *ChildReconciler[T, CT, CLT]) referSameObject(a, b metav1.OwnerReference) bool {
+	aGV, err := schema.ParseGroupVersion(a.APIVersion)
+	if err != nil {
+		return false
+	}
+
+	bGV, err := schema.ParseGroupVersion(b.APIVersion)
+	if err != nil {
+		return false
+	}
+	return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
+}
+
+func (r *ChildReconciler[T, CT, CLT]) newAlreadyOwnedError(obj metav1.Object, owner metav1.OwnerReference) *controllerutil.AlreadyOwnedError {
+	return &controllerutil.AlreadyOwnedError{
+		Object: obj,
+		Owner:  owner,
+	}
 }

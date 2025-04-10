@@ -1160,6 +1160,165 @@ func TestChildReconciler_Unstructured(t *testing.T) {
 	})
 }
 
+func TestChildReconciler_Duck(t *testing.T) {
+	testNamespace := "test-namespace"
+	testName := "test-resource"
+
+	scheme := runtime.NewScheme()
+	_ = resources.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	resource := dies.TestDuckBlank.
+		APIVersion("testing.reconciler.runtime/v1").
+		Kind("TestResource").
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(testNamespace)
+			d.Name(testName)
+		}).
+		StatusDie(func(d *dies.TestResourceStatusDie) {
+			d.ConditionsDie(
+				diemetav1.ConditionBlank.Type(apis.ConditionReady).Status(metav1.ConditionUnknown).Reason("Initializing"),
+			)
+		})
+	resourceReady := resource.
+		StatusDie(func(d *dies.TestResourceStatusDie) {
+			d.ConditionsDie(
+				diemetav1.ConditionBlank.Type(apis.ConditionReady).Status(metav1.ConditionTrue).Reason("Ready"),
+			)
+		})
+
+	configMapCreate := diecorev1.ConfigMapBlank.
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(testNamespace)
+			d.Name(testName)
+			d.ControlledBy(resource, scheme)
+		}).
+		AddData("foo", "bar")
+
+	defaultChildReconciler := func(_ reconcilers.Config) *reconcilers.ChildReconciler[*resources.TestDuck, *corev1.ConfigMap, *corev1.ConfigMapList] {
+		return &reconcilers.ChildReconciler[*resources.TestDuck, *corev1.ConfigMap, *corev1.ConfigMapList]{
+			DesiredChild: func(ctx context.Context, parent *resources.TestDuck) (*corev1.ConfigMap, error) {
+				if len(parent.Spec.Fields) == 0 {
+					return nil, nil
+				}
+
+				return &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: parent.Namespace,
+						Name:      parent.Name,
+					},
+					Data: reconcilers.MergeMaps(parent.Spec.Fields),
+				}, nil
+			},
+			ChildObjectManager: &rtesting.StubObjectManager[*corev1.ConfigMap]{},
+			ReflectChildStatusOnParent: func(ctx context.Context, parent *resources.TestDuck, child *corev1.ConfigMap, err error) {
+				if err != nil {
+					switch {
+					case apierrs.IsAlreadyExists(err):
+						name := err.(apierrs.APIStatus).Status().Details.Name
+						parent.Status.MarkNotReady(ctx, "NameConflict", "%q already exists", name)
+					case apierrs.IsInvalid(err):
+						name := err.(apierrs.APIStatus).Status().Details.Name
+						parent.Status.MarkNotReady(ctx, "InvalidChild", "%q was rejected by the api server", name)
+					}
+					return
+				}
+				if child == nil {
+					parent.Status.Fields = nil
+					parent.Status.MarkReady(ctx)
+					return
+				}
+				parent.Status.Fields = reconcilers.MergeMaps(child.Data)
+				parent.Status.MarkReady(ctx)
+			},
+		}
+	}
+
+	rts := rtesting.SubReconcilerTests[*resources.TestDuck]{
+		"create child": {
+			Resource: resource.
+				SpecDie(func(d *dies.TestDuckSpecDie) {
+					d.AddField("foo", "bar")
+				}).
+				DieReleasePtr(),
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck] {
+					return defaultChildReconciler(c)
+				},
+			},
+			ExpectResource: resourceReady.
+				SpecDie(func(d *dies.TestDuckSpecDie) {
+					d.AddField("foo", "bar")
+				}).
+				StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.AddField("foo", "bar")
+				}).
+				DieReleasePtr(),
+			ExpectCreates: []client.Object{
+				configMapCreate,
+			},
+		},
+		"create child with custom owner reference": {
+			Resource: resource.
+				SpecDie(func(d *dies.TestDuckSpecDie) {
+					d.AddField("foo", "bar")
+				}).
+				DieReleasePtr(),
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck] {
+					r := defaultChildReconciler(c)
+					desiredChild := r.DesiredChild
+					r.DesiredChild = func(ctx context.Context, resource *resources.TestDuck) (*corev1.ConfigMap, error) {
+						child, err := desiredChild(ctx, resource)
+						if child != nil {
+							child.OwnerReferences = []metav1.OwnerReference{
+								{
+									APIVersion: resources.GroupVersion.String(),
+									Kind:       "TestResource",
+									Name:       resource.GetName(),
+									UID:        resource.GetUID(),
+									Controller: ptr.To(true),
+									// the default controller ref is set to block
+									BlockOwnerDeletion: ptr.To(false),
+								},
+							}
+						}
+						return child, err
+					}
+					return r
+				},
+			},
+			ExpectResource: resourceReady.
+				SpecDie(func(d *dies.TestDuckSpecDie) {
+					d.AddField("foo", "bar")
+				}).
+				StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.AddField("foo", "bar")
+				}).
+				DieReleasePtr(),
+			ExpectCreates: []client.Object{
+				configMapCreate.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.OwnerReferences(
+							metav1.OwnerReference{
+								APIVersion:         resources.GroupVersion.String(),
+								Kind:               "TestResource",
+								Name:               resource.GetName(),
+								UID:                resource.GetUID(),
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(false),
+							},
+						)
+					}),
+			},
+		},
+	}
+
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[*resources.TestDuck], c reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck] {
+		return rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck])(t, c)
+	})
+}
+
 func TestChildReconciler_Validate(t *testing.T) {
 	tests := []struct {
 		name       string

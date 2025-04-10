@@ -37,6 +37,19 @@ func IsDuck(obj runtime.Object, scheme *runtime.Scheme) bool {
 	return false
 }
 
+// Convert from one object type to another. This operation is lossy depending on the specific types
+// being converted.
+func Convert(from runtime.Object, to runtime.Object) error {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(from)
+	if err != nil {
+		return fmt.Errorf("unable to convert from object: %w", err)
+	}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u, to); err != nil {
+		return fmt.Errorf("unable to convert to object: %w", err)
+	}
+	return nil
+}
+
 type SchemeAccessor interface {
 	Scheme() *runtime.Scheme
 }
@@ -58,15 +71,14 @@ func (c *duckAwareAPIReaderWrapper) Get(ctx context.Context, key client.ObjectKe
 		return c.reader.Get(ctx, key, obj, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	if err := c.reader.Get(ctx, key, u, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+	return Convert(u, obj)
 }
 
 func (c *duckAwareAPIReaderWrapper) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
@@ -74,15 +86,14 @@ func (c *duckAwareAPIReaderWrapper) List(ctx context.Context, list client.Object
 		return c.reader.List(ctx, list, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(list)
-	if err != nil {
+	u := &unstructured.UnstructuredList{}
+	if err := Convert(list, u); err != nil {
 		return err
 	}
-	u := &unstructured.UnstructuredList{Object: uObj}
 	if err := c.reader.List(ctx, u, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, list)
+	return Convert(u, list)
 }
 
 func NewDuckAwareClientWrapper(client client.Client) client.Client {
@@ -107,16 +118,15 @@ func (c *duckAwareClientWrapper) Watch(ctx context.Context, list client.ObjectLi
 		return ww.Watch(ctx, list, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(list)
-	if err != nil {
+	u := &unstructured.UnstructuredList{}
+	if err := Convert(list, u); err != nil {
 		return nil, err
 	}
-	u := &unstructured.UnstructuredList{Object: uObj}
 	w, err := ww.Watch(ctx, u, opts...)
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, list); err != nil {
+	if err := Convert(u, list); err != nil {
 		return nil, err
 	}
 	return w, nil
@@ -143,15 +153,14 @@ func (c *duckAwareClientWrapper) Patch(ctx context.Context, obj client.Object, p
 		return c.client.Patch(ctx, obj, patch, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	if err := c.client.Patch(ctx, u, patch, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+	return Convert(u, obj)
 }
 
 func (c *duckAwareClientWrapper) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
@@ -159,15 +168,14 @@ func (c *duckAwareClientWrapper) Delete(ctx context.Context, obj client.Object, 
 		return c.client.Delete(ctx, obj, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	if err := c.client.Delete(ctx, u, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+	return Convert(u, obj)
 }
 
 func (c *duckAwareClientWrapper) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
@@ -175,15 +183,14 @@ func (c *duckAwareClientWrapper) DeleteAllOf(ctx context.Context, obj client.Obj
 		return c.client.DeleteAllOf(ctx, obj, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	if err := c.client.DeleteAllOf(ctx, u, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+	return Convert(u, obj)
 }
 
 func (c *duckAwareClientWrapper) Status() client.SubResourceWriter {
@@ -226,11 +233,10 @@ func (c *duckAwareClientWrapper) IsObjectNamespaced(obj runtime.Object) (bool, e
 		return c.client.IsObjectNamespaced(obj)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return false, err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	return c.client.IsObjectNamespaced(u)
 }
 
@@ -260,15 +266,14 @@ func (w *duckAwareSubResourceWriterWrapper) Patch(ctx context.Context, obj clien
 		return w.subResourceWriter.Patch(ctx, obj, patch, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	if err := w.subResourceWriter.Patch(ctx, u, patch, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+	return Convert(u, obj)
 }
 
 type duckAwareSubResourceClientWrapper struct {
@@ -281,15 +286,14 @@ func (c *duckAwareSubResourceClientWrapper) Get(ctx context.Context, obj client.
 		return c.subResourceClient.Get(ctx, obj, subResource, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	if err := c.subResourceClient.Get(ctx, u, subResource, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+	return Convert(u, obj)
 }
 
 func (c *duckAwareSubResourceClientWrapper) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
@@ -313,13 +317,12 @@ func (c *duckAwareSubResourceClientWrapper) Patch(ctx context.Context, obj clien
 		return c.subResourceClient.Patch(ctx, obj, patch, opts...)
 	}
 
-	uObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
 		return err
 	}
-	u := &unstructured.Unstructured{Object: uObj}
 	if err := c.subResourceClient.Patch(ctx, u, patch, opts...); err != nil {
 		return err
 	}
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+	return Convert(u, obj)
 }

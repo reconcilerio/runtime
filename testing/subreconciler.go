@@ -132,6 +132,10 @@ type SubReconcilerTestCase[Type client.Object] struct {
 	Now time.Time
 	// Differ methods to use to compare expected and actual values. An empty string is returned for equivalent items.
 	Differ Differ
+
+	// AdditionalReconciles runs additional reconcile requests with the same reconciler instance.
+	// It should be used to test state that is stored on the reconciler. This is not common.
+	AdditionalReconciles []SubReconcilerTestCase[Type]
 }
 
 // SubReconcilerTests represents a map of reconciler test cases. The map key is the name of each
@@ -324,6 +328,20 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	expectConfig.AssertExpectations(t)
 	for _, config := range tc.AdditionalConfigs {
 		config.AssertExpectations(t)
+	}
+
+	for _, ar := range tc.AdditionalReconciles {
+		if ar.Skip {
+			continue
+		}
+		if ar.Focus {
+			panic("Focus is not allowed for AdditionalReconciles")
+		}
+		t.Run(ar.Name, func(t *testing.T) {
+			ar.Run(t, scheme, func(t *testing.T, rtc *SubReconcilerTestCase[T], c reconcilers.Config) reconcilers.SubReconciler[T] {
+				return r
+			})
+		})
 	}
 }
 

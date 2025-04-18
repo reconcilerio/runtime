@@ -29,6 +29,7 @@ Within an existing Kubebuilder or controller-runtime project, reconcilers.io may
 		- [OverrideSetup](#overridesetup)
 		- [WithConfig](#withconfig)
 		- [WithFinalizer](#withfinalizer)
+		- [SuppressTransientErrors](#suppresstransienterrors)
 	- [AdmissionWebhookAdapter](#admissionwebhookadapter)
 - [Testing](#testing)
 	- [ReconcilerTests](#reconcilertests)
@@ -699,6 +700,33 @@ func SyncExternalState() *reconcilers.SubReconciler[*resources.MyResource] {
 	}
 }
 ```
+
+#### SuppressTransientErrors
+
+[`SuppressTransientErrors`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#SuppressTransientErrors) prevents flapping status updates for transient errors. Status updates are allowed as normal for:
+- requests that don't error
+- requests that result in an [`ErrDurable`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#ErrDurable) error
+- requests that repeatedly error exceeding the `Threshold` (defaults to 3)
+
+Durable errors are always candidates for status updates and reset the transient counter. Errors not explicitly marked as durable are assumed to be transient. `ErrDurable` can either be returned directly, or joined/wrapped with other errors.
+
+Nested SubReconcilers should reflect the content of the error on the resource's status to the best of their ability. The `SuppressTransientErrors` reconciler will indicate if the status update should be skipped.
+
+**Example:**
+
+`SuppressTransientErrors` should be installed as close to the root of the reconciler hierarchy as possible. to ensure all error sources are captured.
+
+```go
+
+func MyResourceReconciler(c reconcilers.Config) *reconcilers.ResourceReconciler[*resources.MyResource] {
+	return &reconcilers.ResourceReconciler[*resources.MyResource]{
+		Reconciler: reconcilers.SuppressTransientErrors[*resources.MyResource, *resources.MyResourceList]{
+			Reconciler: SomethingThatMayFail(),
+		},
+	}
+}
+```
+
 
 ### AdmissionWebhookAdapter
 

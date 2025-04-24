@@ -67,7 +67,7 @@ var (
 )
 
 func (r *eventRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	r.Eventf(object, eventtype, reason, message)
+	r.Eventf(object, eventtype, reason, "%s", message)
 }
 
 func (r *eventRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {

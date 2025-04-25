@@ -84,6 +84,15 @@ func (d *TestResourceDie) DieFeedPtr(r *resources.TestResource) *TestResourceDie
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceDie) DieFeedDuck(v any) *TestResourceDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceDie) DieFeedJSON(j []byte) *TestResourceDie {
 	r := resources.TestResource{}
@@ -144,6 +153,15 @@ func (d *TestResourceDie) DieReleaseUnstructured() *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -426,6 +444,15 @@ func (d *TestResourceSpecDie) DieFeedPtr(r *resources.TestResourceSpec) *TestRes
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceSpecDie) DieFeedDuck(v any) *TestResourceSpecDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceSpecDie) DieFeedJSON(j []byte) *TestResourceSpecDie {
 	r := resources.TestResourceSpec{}
@@ -474,6 +501,15 @@ func (d *TestResourceSpecDie) DieRelease() resources.TestResourceSpec {
 func (d *TestResourceSpecDie) DieReleasePtr() *resources.TestResourceSpec {
 	r := d.DieRelease()
 	return &r
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceSpecDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -687,6 +723,15 @@ func (d *TestResourceStatusDie) DieFeedPtr(r *resources.TestResourceStatus) *Tes
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceStatusDie) DieFeedDuck(v any) *TestResourceStatusDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceStatusDie) DieFeedJSON(j []byte) *TestResourceStatusDie {
 	r := resources.TestResourceStatus{}
@@ -735,6 +780,15 @@ func (d *TestResourceStatusDie) DieRelease() resources.TestResourceStatus {
 func (d *TestResourceStatusDie) DieReleasePtr() *resources.TestResourceStatus {
 	r := d.DieRelease()
 	return &r
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceStatusDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -930,6 +984,15 @@ func (d *TestResourceEmptyStatusDie) DieFeedPtr(r *resources.TestResourceEmptySt
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceEmptyStatusDie) DieFeedDuck(v any) *TestResourceEmptyStatusDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceEmptyStatusDie) DieFeedJSON(j []byte) *TestResourceEmptyStatusDie {
 	r := resources.TestResourceEmptyStatus{}
@@ -990,6 +1053,15 @@ func (d *TestResourceEmptyStatusDie) DieReleaseUnstructured() *unstructured.Unst
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceEmptyStatusDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -1272,6 +1344,15 @@ func (d *TestResourceEmptyStatusStatusDie) DieFeedPtr(r *resources.TestResourceE
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceEmptyStatusStatusDie) DieFeedDuck(v any) *TestResourceEmptyStatusStatusDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceEmptyStatusStatusDie) DieFeedJSON(j []byte) *TestResourceEmptyStatusStatusDie {
 	r := resources.TestResourceEmptyStatusStatus{}
@@ -1320,6 +1401,15 @@ func (d *TestResourceEmptyStatusStatusDie) DieRelease() resources.TestResourceEm
 func (d *TestResourceEmptyStatusStatusDie) DieReleasePtr() *resources.TestResourceEmptyStatusStatus {
 	r := d.DieRelease()
 	return &r
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceEmptyStatusStatusDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -1503,6 +1593,15 @@ func (d *TestResourceNoStatusDie) DieFeedPtr(r *resources.TestResourceNoStatus) 
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceNoStatusDie) DieFeedDuck(v any) *TestResourceNoStatusDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceNoStatusDie) DieFeedJSON(j []byte) *TestResourceNoStatusDie {
 	r := resources.TestResourceNoStatus{}
@@ -1563,6 +1662,15 @@ func (d *TestResourceNoStatusDie) DieReleaseUnstructured() *unstructured.Unstruc
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceNoStatusDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -1833,6 +1941,15 @@ func (d *TestResourceNilableStatusDie) DieFeedPtr(r *resources.TestResourceNilab
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceNilableStatusDie) DieFeedDuck(v any) *TestResourceNilableStatusDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceNilableStatusDie) DieFeedJSON(j []byte) *TestResourceNilableStatusDie {
 	r := resources.TestResourceNilableStatus{}
@@ -1893,6 +2010,15 @@ func (d *TestResourceNilableStatusDie) DieReleaseUnstructured() *unstructured.Un
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceNilableStatusDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -2178,6 +2304,15 @@ func (d *TestDuckDie) DieFeedPtr(r *resources.TestDuck) *TestDuckDie {
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestDuckDie) DieFeedDuck(v any) *TestDuckDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestDuckDie) DieFeedJSON(j []byte) *TestDuckDie {
 	r := resources.TestDuck{}
@@ -2238,6 +2373,15 @@ func (d *TestDuckDie) DieReleaseUnstructured() *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestDuckDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -2520,6 +2664,15 @@ func (d *TestDuckSpecDie) DieFeedPtr(r *resources.TestDuckSpec) *TestDuckSpecDie
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestDuckSpecDie) DieFeedDuck(v any) *TestDuckSpecDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestDuckSpecDie) DieFeedJSON(j []byte) *TestDuckSpecDie {
 	r := resources.TestDuckSpec{}
@@ -2568,6 +2721,15 @@ func (d *TestDuckSpecDie) DieRelease() resources.TestDuckSpec {
 func (d *TestDuckSpecDie) DieReleasePtr() *resources.TestDuckSpec {
 	r := d.DieRelease()
 	return &r
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestDuckSpecDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -2757,6 +2919,15 @@ func (d *TestResourceUnexportedFieldsDie) DieFeedPtr(r *resources.TestResourceUn
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceUnexportedFieldsDie) DieFeedDuck(v any) *TestResourceUnexportedFieldsDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceUnexportedFieldsDie) DieFeedJSON(j []byte) *TestResourceUnexportedFieldsDie {
 	r := resources.TestResourceUnexportedFields{}
@@ -2817,6 +2988,15 @@ func (d *TestResourceUnexportedFieldsDie) DieReleaseUnstructured() *unstructured
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceUnexportedFieldsDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -3099,6 +3279,15 @@ func (d *TestResourceUnexportedFieldsSpecDie) DieFeedPtr(r *resources.TestResour
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceUnexportedFieldsSpecDie) DieFeedDuck(v any) *TestResourceUnexportedFieldsSpecDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceUnexportedFieldsSpecDie) DieFeedJSON(j []byte) *TestResourceUnexportedFieldsSpecDie {
 	r := resources.TestResourceUnexportedFieldsSpec{}
@@ -3147,6 +3336,15 @@ func (d *TestResourceUnexportedFieldsSpecDie) DieRelease() resources.TestResourc
 func (d *TestResourceUnexportedFieldsSpecDie) DieReleasePtr() *resources.TestResourceUnexportedFieldsSpec {
 	r := d.DieRelease()
 	return &r
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceUnexportedFieldsSpecDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -3360,6 +3558,15 @@ func (d *TestResourceUnexportedFieldsStatusDie) DieFeedPtr(r *resources.TestReso
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceUnexportedFieldsStatusDie) DieFeedDuck(v any) *TestResourceUnexportedFieldsStatusDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceUnexportedFieldsStatusDie) DieFeedJSON(j []byte) *TestResourceUnexportedFieldsStatusDie {
 	r := resources.TestResourceUnexportedFieldsStatus{}
@@ -3408,6 +3615,15 @@ func (d *TestResourceUnexportedFieldsStatusDie) DieRelease() resources.TestResou
 func (d *TestResourceUnexportedFieldsStatusDie) DieReleasePtr() *resources.TestResourceUnexportedFieldsStatus {
 	r := d.DieRelease()
 	return &r
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceUnexportedFieldsStatusDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.
@@ -3603,6 +3819,15 @@ func (d *TestResourceWithLegacyDefaultDie) DieFeedPtr(r *resources.TestResourceW
 	return d.DieFeed(*r)
 }
 
+// DieFeedDuck returns a new die with the provided value converted into the underlying type. Panics on error.
+func (d *TestResourceWithLegacyDefaultDie) DieFeedDuck(v any) *TestResourceWithLegacyDefaultDie {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return d.DieFeedJSON(data)
+}
+
 // DieFeedJSON returns a new die with the provided JSON. Panics on error.
 func (d *TestResourceWithLegacyDefaultDie) DieFeedJSON(j []byte) *TestResourceWithLegacyDefaultDie {
 	r := resources.TestResourceWithLegacyDefault{}
@@ -3663,6 +3888,15 @@ func (d *TestResourceWithLegacyDefaultDie) DieReleaseUnstructured() *unstructure
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+// DieReleaseDuck releases the value into the passed value and returns the same. Panics on error.
+func (d *TestResourceWithLegacyDefaultDie) DieReleaseDuck(v any) any {
+	data := d.DieReleaseJSON()
+	if err := json.Unmarshal(data, v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // DieReleaseJSON returns the resource managed by the die as JSON. Panics on error.

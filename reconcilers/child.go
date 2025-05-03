@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/validation"
 )
 
 var (
@@ -197,8 +200,15 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 	}
 
 	if !r.SkipOwnerReference {
-		bldr.Owns(r.ChildType)
-		bldr.Watches(r.ChildType, EnqueueTracked(ctx))
+		var ct client.Object = r.ChildType
+		if duck.IsDuck(ct, mgr.GetScheme()) {
+			gvk := ct.GetObjectKind().GroupVersionKind()
+			ct = &unstructured.Unstructured{}
+			ct.GetObjectKind().SetGroupVersionKind(gvk)
+		}
+
+		bldr.Owns(ct)
+		bldr.Watches(ct, EnqueueTracked(ctx))
 	}
 
 	if err := r.ChildObjectManager.SetupWithManager(ctx, mgr, bldr); err != nil {
@@ -240,6 +250,13 @@ func (r *ChildReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
 	// require ChildObjectManager
 	if r.ChildObjectManager == nil {
 		return fmt.Errorf("ChildReconciler %q must implement ChildObjectManager", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.ChildObjectManager.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("ChildReconciler %q must have a valid ChildObjectManager: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

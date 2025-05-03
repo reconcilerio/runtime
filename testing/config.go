@@ -548,14 +548,18 @@ func NewDeleteRef(action DeleteAction) DeleteRef {
 }
 
 func NewDeleteRefFromObject(obj client.Object, scheme *runtime.Scheme) DeleteRef {
-	gvks, _, err := scheme.ObjectKinds(obj.DeepCopyObject())
-	if err != nil {
-		panic(err)
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if !duck.IsDuck(obj, scheme) {
+		gvks, _, err := scheme.ObjectKinds(obj.DeepCopyObject())
+		if err != nil {
+			panic(err)
+		}
+		gvk = gvks[0]
 	}
 
 	return DeleteRef{
-		Group:     gvks[0].Group,
-		Kind:      gvks[0].Kind,
+		Group:     gvk.Group,
+		Kind:      gvk.Kind,
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}

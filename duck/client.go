@@ -103,9 +103,19 @@ func NewDuckAwareClientWrapper(client client.Client) client.Client {
 	}
 }
 
+func NewDangerousDuckAwareClientWrapper(client client.Client) client.Client {
+	return &duckAwareClientWrapper{
+		Reader:                 NewDuckAwareAPIReaderWrapper(client, client),
+		client:                 client,
+		allowDangerousRequests: true,
+	}
+}
+
 type duckAwareClientWrapper struct {
 	client.Reader
 	client client.Client
+
+	allowDangerousRequests bool
 }
 
 func (c *duckAwareClientWrapper) Watch(ctx context.Context, list client.ObjectList, opts ...client.ListOption) (watch.Interface, error) {
@@ -137,7 +147,18 @@ func (c *duckAwareClientWrapper) Create(ctx context.Context, obj client.Object, 
 		return c.client.Create(ctx, obj, opts...)
 	}
 
-	return fmt.Errorf("Create is not supported for the duck typed objects")
+	if !c.allowDangerousRequests {
+		return fmt.Errorf("Create is not supported for the duck typed objects")
+	}
+
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
+		return err
+	}
+	if err := c.client.Create(ctx, u, opts...); err != nil {
+		return err
+	}
+	return Convert(u, obj)
 }
 
 func (c *duckAwareClientWrapper) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
@@ -145,7 +166,18 @@ func (c *duckAwareClientWrapper) Update(ctx context.Context, obj client.Object, 
 		return c.client.Update(ctx, obj, opts...)
 	}
 
-	return fmt.Errorf("Update is not supported for the duck typed objects, use Patch instead")
+	if !c.allowDangerousRequests {
+		return fmt.Errorf("Update is not supported for the duck typed objects, use Patch instead")
+	}
+
+	u := &unstructured.Unstructured{}
+	if err := Convert(obj, u); err != nil {
+		return err
+	}
+	if err := c.client.Update(ctx, u, opts...); err != nil {
+		return err
+	}
+	return Convert(u, obj)
 }
 
 func (c *duckAwareClientWrapper) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {

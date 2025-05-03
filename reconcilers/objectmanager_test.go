@@ -455,31 +455,467 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ObjectManager: rtc.Metadata["ObjectManager"].(reconcilers.ObjectManager[*corev1.ConfigMap]),
 		}
 	})
+}
 
+func TestUpdatingObjectManager_Duck(t *testing.T) {
+	testNamespace := "test-namespace"
+	testName := "test-resource"
+	testFinalizer := "test-finalizer"
+
+	scheme := runtime.NewScheme()
+	_ = resources.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	now := metav1.Time{Time: time.Now().Truncate(time.Second)}
+
+	resource := dies.TestResourceBlank.
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(testNamespace)
+			d.Name(testName)
+		}).
+		StatusDie(func(d *dies.TestResourceStatusDie) {
+			d.ConditionsDie(
+				diemetav1.ConditionBlank.Type(apis.ConditionReady).Status(metav1.ConditionUnknown).Reason("Initializing"),
+			)
+		})
+
+	desiredTestDuck := dies.TestDuckBlank.
+		APIVersion("example.com").
+		Kind("Test").
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Name(testName)
+			d.Namespace(testNamespace)
+		}).
+		SpecDie(func(d *dies.TestDuckSpecDie) {
+			d.AddField("hello", "world")
+		})
+	givenTestDuck := desiredTestDuck.MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+		d.CreationTimestamp(now)
+	})
+
+	makeUpdatingObjectManager := func(modifiers ...func(*reconcilers.UpdatingObjectManager[*resources.TestDuck])) *reconcilers.UpdatingObjectManager[*resources.TestDuck] {
+		om := &reconcilers.UpdatingObjectManager[*resources.TestDuck]{
+			DangerouslyAllowDuckTypes: true,
+			MergeBeforeUpdate: func(current, desired *resources.TestDuck) {
+				current.Labels = desired.Labels
+				current.Spec = desired.Spec
+			},
+		}
+		for i := range modifiers {
+			modifiers[i](om)
+		}
+		return om
+	}
+	withFinalizer := func(finalizer string) func(*reconcilers.UpdatingObjectManager[*resources.TestDuck]) {
+		return func(om *reconcilers.UpdatingObjectManager[*resources.TestDuck]) {
+			om.Finalizer = finalizer
+		}
+	}
+	withTrackDesired := func(trackDesired bool) func(*reconcilers.UpdatingObjectManager[*resources.TestDuck]) {
+		return func(om *reconcilers.UpdatingObjectManager[*resources.TestDuck]) {
+			om.TrackDesired = trackDesired
+		}
+	}
+	withHarmonizeImmutableFields := func(harmonizeImmutableFields func(*resources.TestDuck, *resources.TestDuck)) func(*reconcilers.UpdatingObjectManager[*resources.TestDuck]) {
+		return func(om *reconcilers.UpdatingObjectManager[*resources.TestDuck]) {
+			om.HarmonizeImmutableFields = harmonizeImmutableFields
+		}
+	}
+
+	actualStashKey := rtesting.ObjectManagerReconcilerTestHarnessActualStasher[*resources.TestDuck]().Key()
+	desiredStashKey := rtesting.ObjectManagerReconcilerTestHarnessDesiredStasher[*resources.TestDuck]().Key()
+	resultStashKey := rtesting.ObjectManagerReconcilerTestHarnessResultStasher[*resources.TestDuck]().Key()
+
+	rts := rtesting.SubReconcilerTests[client.Object]{
+		"in sync": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  givenTestDuck.DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: givenTestDuck.DieReleasePtr(),
+			},
+		},
+		"missing and desired": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  nil,
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created", `Created Test %q`, testName),
+			},
+			ExpectCreates: []client.Object{
+				desiredTestDuck.DieReleaseUnstructured(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+		},
+		"missing and desired, blank actual": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  dies.TestDuckBlank.APIVersion("example.com").Kind("Test").DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created", `Created Test %q`, testName),
+			},
+			ExpectCreates: []client.Object{
+				desiredTestDuck.DieReleaseUnstructured(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+		},
+		"missing and desired, errored": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  nil,
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("create", "Test"),
+			},
+			ShouldErr: true,
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "CreationFailed", `Failed to create Test %q: inducing failure for create Test`, testName),
+			},
+			ExpectCreates: []client.Object{
+				desiredTestDuck.DieReleaseUnstructured(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: nil,
+			},
+		},
+		"correct drift": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey: givenTestDuck.
+					SpecDie(func(d *dies.TestDuckSpecDie) {
+						d.AddField("foo", "bar")
+					}).
+					DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Updated", `Updated Test %q`, testName),
+			},
+			ExpectUpdates: []client.Object{
+				desiredTestDuck.DieReleaseUnstructured(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+		},
+		"correct drift, errored": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey: givenTestDuck.
+					SpecDie(func(d *dies.TestDuckSpecDie) {
+						d.AddField("foo", "bar")
+					}).
+					DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("update", "Test"),
+			},
+			ShouldErr: true,
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "UpdateFailed", `Failed to update Test %q: inducing failure for update Test`, testName),
+			},
+			ExpectUpdates: []client.Object{
+				desiredTestDuck.DieReleaseUnstructured(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: nil,
+			},
+		},
+		"cleanup": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey: givenTestDuck.
+					SpecDie(func(d *dies.TestDuckSpecDie) {
+						d.AddField("foo", "bar")
+					}).
+					DieReleasePtr(),
+				desiredStashKey: nil,
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Deleted", `Deleted Test %q`, testName),
+			},
+			ExpectDeletes: []rtesting.DeleteRef{
+				rtesting.NewDeleteRefFromObject(givenTestDuck, scheme),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: nil,
+			},
+		},
+		"cleanup, errored": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey: givenTestDuck.
+					SpecDie(func(d *dies.TestDuckSpecDie) {
+						d.AddField("foo", "bar")
+					}).
+					DieReleasePtr(),
+				desiredStashKey: nil,
+			},
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("delete", "Test"),
+			},
+			ShouldErr: true,
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeWarning, "DeleteFailed", `Failed to delete Test %q: inducing failure for delete Test`, testName),
+			},
+			ExpectDeletes: []rtesting.DeleteRef{
+				rtesting.NewDeleteRefFromObject(givenTestDuck, scheme),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: nil,
+			},
+		},
+		"in sync with finalizer": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.
+				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.Finalizers(testFinalizer)
+				}).
+				DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(
+					withFinalizer(testFinalizer),
+				),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  givenTestDuck.DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: givenTestDuck.DieReleasePtr(),
+			},
+		},
+		"in sync missing finalizer": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(
+					withFinalizer(testFinalizer),
+				),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  givenTestDuck.DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectResource: resource.
+				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.Finalizers(testFinalizer)
+					d.ResourceVersion("1000")
+				}).
+				DieReleasePtr(),
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched", `Patched finalizer %q`, testFinalizer),
+			},
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:       "testing.reconciler.runtime",
+					Kind:        "TestResource",
+					Namespace:   testNamespace,
+					Name:        testName,
+					SubResource: "",
+					PatchType:   types.MergePatchType,
+					Patch:       []byte(`{"metadata":{"finalizers":["test-finalizer"],"resourceVersion":"999"}}`),
+				},
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: givenTestDuck.DieReleasePtr(),
+			},
+		},
+		"cleanup finalizer": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.
+				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.Finalizers(testFinalizer)
+				}).
+				DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(
+					withFinalizer(testFinalizer),
+				),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  nil,
+				desiredStashKey: nil,
+			},
+			ExpectResource: resource.
+				MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+					d.Finalizers()
+					d.ResourceVersion("1000")
+				}).
+				DieReleasePtr(),
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "FinalizerPatched", `Patched finalizer %q`, testFinalizer),
+			},
+			ExpectPatches: []rtesting.PatchRef{
+				{
+					Group:       "testing.reconciler.runtime",
+					Kind:        "TestResource",
+					Namespace:   testNamespace,
+					Name:        testName,
+					SubResource: "",
+					PatchType:   types.MergePatchType,
+					Patch:       []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
+				},
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: nil,
+			},
+		},
+		"track given": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(
+					withTrackDesired(true),
+				),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey:  givenTestDuck.DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(givenTestDuck, resource, scheme),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: givenTestDuck.DieReleasePtr(),
+			},
+		},
+		"track generated names": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(
+					withTrackDesired(true),
+				),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey: nil,
+				desiredStashKey: desiredTestDuck.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Name("")
+						d.GenerateName(testName + "-")
+					}).
+					DieReleasePtr(),
+			},
+			ExpectTracks: []rtesting.TrackRequest{
+				rtesting.NewTrackRequest(givenTestDuck.MetadataDie(func(d *diemetav1.ObjectMetaDie) { d.Name(testName + "-001") }), resource, scheme),
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(resource, scheme, corev1.EventTypeNormal, "Created", `Created Test %q`, testName+"-001"),
+			},
+			ExpectCreates: []client.Object{
+				desiredTestDuck.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Name("")
+						d.GenerateName(testName + "-")
+					}).
+					DieReleaseUnstructured(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: desiredTestDuck.
+					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+						d.Name(testName + "-001")
+						d.GenerateName(testName + "-")
+					}).
+					DieReleasePtr(),
+			},
+		},
+		"ignore drift in immutable fields": rtesting.SubReconcilerTestCase[client.Object]{
+			Resource: resource.DieReleasePtr(),
+			Metadata: map[string]any{
+				"ObjectManager": makeUpdatingObjectManager(
+					withHarmonizeImmutableFields(func(actual, desired *resources.TestDuck) {
+						if actual.Spec.Immutable != nil && *actual.Spec.Immutable {
+							// data is immutable, align desired with actual
+							desired.Spec = actual.Spec
+						}
+					}),
+				),
+			},
+			GivenStashedValues: map[reconcilers.StashKey]any{
+				actualStashKey: givenTestDuck.
+					SpecDie(func(d *dies.TestDuckSpecDie) {
+						d.Immutable(ptr.To[bool](true))
+						d.AddField("foo", "bar")
+					}).
+					DieReleasePtr(),
+				desiredStashKey: desiredTestDuck.DieReleasePtr(),
+			},
+			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+				resultStashKey: givenTestDuck.
+					SpecDie(func(d *dies.TestDuckSpecDie) {
+						d.Immutable(ptr.To[bool](true))
+						d.AddField("foo", "bar")
+					}).
+					DieReleasePtr(),
+			},
+		},
+	}
+
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.SubReconcilerTestCase[client.Object], c reconcilers.Config) reconcilers.SubReconciler[client.Object] {
+		return &rtesting.ObjectManagerReconcilerTestHarness[*resources.TestDuck]{
+			ObjectManager: rtc.Metadata["ObjectManager"].(reconcilers.ObjectManager[*resources.TestDuck]),
+		}
+	})
 }
 
 func TestUpdatingObjectManager_Validate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = resources.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
+
 	tests := []struct {
-		name         string
-		reconciler   *reconcilers.UpdatingObjectManager[*resources.TestResource]
-		shouldErr    string
-		expectedLogs []string
+		name          string
+		objectManager *reconcilers.UpdatingObjectManager[*resources.TestResource]
+		shouldErr     string
+		expectedLogs  []string
 	}{
 		{
-			name:       "empty",
-			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
-			shouldErr:  `UpdatingObjectManager "" must define MergeBeforeUpdate`,
+			name:          "empty",
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
+			shouldErr:     `UpdatingObjectManager "" must define MergeBeforeUpdate`,
 		},
 		{
 			name: "valid",
-			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
 				Type:              &resources.TestResource{},
 				MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
 			},
 		},
 		{
 			name: "Type missing",
-			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
 				Name: "Type missing",
 				// Type:              &resources.TestResource{},
 				MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
@@ -487,7 +923,7 @@ func TestUpdatingObjectManager_Validate(t *testing.T) {
 		},
 		{
 			name: "MergeBeforeUpdate missing",
-			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
 				Name: "MergeBeforeUpdate missing",
 				Type: &resources.TestResource{},
 				// MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
@@ -496,7 +932,7 @@ func TestUpdatingObjectManager_Validate(t *testing.T) {
 		},
 		{
 			name: "HarmonizeImmutableFields",
-			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
 				Type:                     &resources.TestResource{},
 				MergeBeforeUpdate:        func(current, desired *resources.TestResource) {},
 				HarmonizeImmutableFields: func(current, desired *resources.TestResource) {},
@@ -504,7 +940,7 @@ func TestUpdatingObjectManager_Validate(t *testing.T) {
 		},
 		{
 			name: "Sanitize",
-			reconciler: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{
 				Type:              &resources.TestResource{},
 				MergeBeforeUpdate: func(current, desired *resources.TestResource) {},
 				Sanitize:          func(child *resources.TestResource) interface{} { return child.Spec },
@@ -512,16 +948,81 @@ func TestUpdatingObjectManager_Validate(t *testing.T) {
 		},
 	}
 
-	for _, c := range tests {
-		t.Run(c.name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			sink := &bufferedSink{}
 			ctx := logr.NewContext(context.TODO(), logr.New(sink))
-			err := c.reconciler.Validate(ctx)
-			if (err != nil) != (c.shouldErr != "") || (c.shouldErr != "" && c.shouldErr != err.Error()) {
-				t.Errorf("validate() error = %q, shouldErr %q", err, c.shouldErr)
+			c := (&rtesting.ExpectConfig{
+				Scheme: scheme,
+			}).Config()
+			ctx = reconcilers.StashConfig(ctx, c)
+			err := tc.objectManager.Validate(ctx)
+			if (err != nil) != (tc.shouldErr != "") || (tc.shouldErr != "" && tc.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, tc.shouldErr)
 			}
-			if diff := cmp.Diff(c.expectedLogs, sink.Lines); diff != "" {
-				t.Errorf("%s: unexpected logs (-expected, +actual): %s", c.name, diff)
+			if diff := cmp.Diff(tc.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", tc.name, diff)
+			}
+		})
+	}
+}
+
+func TestUpdatingObjectManager_Validate_Duck(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = resources.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	tests := []struct {
+		name          string
+		objectManager *reconcilers.UpdatingObjectManager[*resources.TestDuck]
+		shouldErr     string
+		expectedLogs  []string
+	}{
+		{
+			name: "require DangerouslyAllowDuckTypes for duck types",
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestDuck]{
+				Name: "require DangerouslyAllowDuckTypes for duck types",
+				Type: &resources.TestDuck{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "example.com",
+						Kind:       "Test",
+					},
+				},
+				MergeBeforeUpdate: func(current, desired *resources.TestDuck) {},
+				// DangerouslyAllowDuckTypes: true,
+			},
+			shouldErr: `UpdatingObjectManager "require DangerouslyAllowDuckTypes for duck types" must enable DangerouslyAllowDuckTypes to use a duck type`,
+		},
+		{
+			name: "valid for ducks with DangerouslyAllowDuckTypes",
+			objectManager: &reconcilers.UpdatingObjectManager[*resources.TestDuck]{
+				Name: "require DangerouslyAllowDuckTypes for duck types",
+				Type: &resources.TestDuck{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "example.com",
+						Kind:       "Test",
+					},
+				},
+				MergeBeforeUpdate:         func(current, desired *resources.TestDuck) {},
+				DangerouslyAllowDuckTypes: true,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sink := &bufferedSink{}
+			ctx := logr.NewContext(context.TODO(), logr.New(sink))
+			c := (&rtesting.ExpectConfig{
+				Scheme: scheme,
+			}).Config()
+			ctx = reconcilers.StashConfig(ctx, c)
+			err := tc.objectManager.Validate(ctx)
+			if (err != nil) != (tc.shouldErr != "") || (tc.shouldErr != "" && tc.shouldErr != err.Error()) {
+				t.Errorf("validate() error = %q, shouldErr %q", err, tc.shouldErr)
+			}
+			if diff := cmp.Diff(tc.expectedLogs, sink.Lines); diff != "" {
+				t.Errorf("%s: unexpected logs (-expected, +actual): %s", tc.name, diff)
 			}
 		})
 	}

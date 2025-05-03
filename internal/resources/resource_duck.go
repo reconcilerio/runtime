@@ -51,7 +51,7 @@ func (*TestDuck) Default(ctx context.Context, obj runtime.Object) error {
 		r.Spec.Fields = map[string]string{}
 	}
 	r.Spec.Fields["Defaulter"] = "ran"
-	return  nil
+	return nil
 }
 
 func (r *TestDuck) ValidateCreate() (admission.Warnings, error) {
@@ -80,7 +80,8 @@ func (r *TestDuck) validate() field.ErrorList {
 
 // +kubebuilder:object:generate=true
 type TestDuckSpec struct {
-	Fields map[string]string `json:"fields,omitempty"`
+	Immutable *bool             `json:"immutable,omitempty"`
+	Fields    map[string]string `json:"fields,omitempty"`
 }
 
 // +kubebuilder:object:root=true

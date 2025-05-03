@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/reference"
+	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/tracker"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -76,14 +77,20 @@ func CreateTrackRequest(trackedObjGroup, trackedObjKind, trackedObjNamespace, tr
 
 func NewTrackRequest(t, b client.Object, scheme *runtime.Scheme) TrackRequest {
 	tracked, by := t.DeepCopyObject().(client.Object), b.DeepCopyObject().(client.Object)
-	gvks, _, err := scheme.ObjectKinds(tracked)
-	if err != nil {
-		panic(err)
+
+	gvk := tracked.GetObjectKind().GroupVersionKind()
+	if !duck.IsDuck(tracked, scheme) {
+		gvks, _, err := scheme.ObjectKinds(tracked)
+		if err != nil {
+			panic(err)
+		}
+		gvk = gvks[0]
 	}
+
 	return TrackRequest{
 		TrackedReference: tracker.Reference{
-			APIGroup:  gvks[0].Group,
-			Kind:      gvks[0].Kind,
+			APIGroup:  gvk.Group,
+			Kind:      gvk.Kind,
 			Namespace: tracked.GetNamespace(),
 			Name:      tracked.GetName(),
 		},

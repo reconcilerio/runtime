@@ -2871,6 +2871,12 @@ func (d *TestDuckSpecDie) DiePatch(patchType types.PatchType) ([]byte, error) {
 	return patch.Create(d.seal, d.r, patchType)
 }
 
+func (d *TestDuckSpecDie) Immutable(v *bool) *TestDuckSpecDie {
+	return d.DieStamp(func(r *resources.TestDuckSpec) {
+		r.Immutable = v
+	})
+}
+
 func (d *TestDuckSpecDie) Fields(v map[string]string) *TestDuckSpecDie {
 	return d.DieStamp(func(r *resources.TestDuckSpec) {
 		r.Fields = v

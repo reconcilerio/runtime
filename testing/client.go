@@ -23,10 +23,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgotesting "k8s.io/client-go/testing"
 	ref "k8s.io/client-go/tools/reference"
+	"reconciler.io/runtime/duck"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -101,6 +103,13 @@ func prepareObjects(objs []client.Object) []client.Object {
 
 func (w *clientWrapper) AddGiven(objs ...client.Object) {
 	for _, obj := range prepareObjects(objs) {
+		if duck.IsDuck(obj, w.client.Scheme()) {
+			u := &unstructured.Unstructured{}
+			if err := duck.Convert(obj, u); err != nil {
+				panic(err)
+			}
+			obj = u
+		}
 		if err := w.tracker.Add(obj); err != nil {
 			panic(err)
 		}

@@ -30,12 +30,15 @@ import (
 	jsonpatch "gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/validation"
 )
 
 type ObjectManager[Type client.Object] interface {
@@ -44,6 +47,7 @@ type ObjectManager[Type client.Object] interface {
 }
 
 var _ ObjectManager[client.Object] = (*UpdatingObjectManager[client.Object])(nil)
+var _ validation.Validator = (*UpdatingObjectManager[client.Object])(nil)
 
 // UpdatingObjectManager compares the actual and desired resources to create/update/delete as desired.
 type UpdatingObjectManager[Type client.Object] struct {
@@ -94,6 +98,16 @@ type UpdatingObjectManager[Type client.Object] struct {
 	// +optional
 	Sanitize func(child Type) interface{}
 
+	// DangerouslyAllowDuckTypes allows the Type to be a duck typed resource. This is dangerous
+	// because duck types typically represent a subset of the target resource and may cause data
+	// loss if the resource's server representation contains fields that do not exist on the duck
+	// typed object.
+	//
+	// Use of this setting should be limited to when the author is certain the duck type is able to
+	// represent the resource with full fidelity, or when data loss for unrepresented fields is
+	// acceptable.
+	DangerouslyAllowDuckTypes bool
+
 	// mutationCache holds patches received from updates to a resource made by
 	// mutation webhooks. This cache is used to avoid unnecessary update calls
 	// that would actually have no effect.
@@ -126,16 +140,30 @@ func (r *UpdatingObjectManager[T]) SetupWithManager(ctx context.Context, mgr ctr
 	}
 
 	if r.TrackDesired {
-		bldr.Watches(r.Type, EnqueueTracked(ctx))
+		var ct client.Object = r.Type
+		if duck.IsDuck(ct, mgr.GetScheme()) {
+			gvk := ct.GetObjectKind().GroupVersionKind()
+			ct = &unstructured.Unstructured{}
+			ct.GetObjectKind().SetGroupVersionKind(gvk)
+		}
+
+		bldr.Watches(ct, EnqueueTracked(ctx))
 	}
 
 	return nil
 }
 
 func (r *UpdatingObjectManager[T]) Validate(ctx context.Context) error {
+	c := RetrieveConfigOrDie(ctx)
+
 	// require MergeBeforeUpdate
 	if r.MergeBeforeUpdate == nil {
 		return fmt.Errorf("UpdatingObjectManager %q must define MergeBeforeUpdate", r.Name)
+	}
+
+	// require DangerouslyAllowDuckTypes for duck types
+	if !r.DangerouslyAllowDuckTypes && duck.IsDuck(r.Type, c.Scheme()) {
+		return fmt.Errorf("UpdatingObjectManager %q must enable DangerouslyAllowDuckTypes to use a duck type", r.Name)
 	}
 
 	return nil
@@ -152,6 +180,10 @@ func (r *UpdatingObjectManager[T]) Manage(ctx context.Context, resource client.O
 	log := logr.FromContextOrDiscard(ctx)
 	pc := RetrieveOriginalConfigOrDie(ctx)
 	c := RetrieveConfigOrDie(ctx)
+	if r.DangerouslyAllowDuckTypes {
+		c = c.WithDangerousDuckClientOperations()
+		ctx = StashConfig(ctx, c)
+	}
 
 	if (internal.IsNil(actual) || actual.GetCreationTimestamp().Time.IsZero()) && internal.IsNil(desired) {
 		if err := ClearFinalizer(ctx, resource, r.Finalizer); err != nil {

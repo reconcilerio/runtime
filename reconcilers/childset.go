@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -290,6 +291,13 @@ func (r *ChildSetReconciler[T, CT, CLT]) Validate(ctx context.Context) error {
 	// require ChildObjectManager
 	if r.ChildObjectManager == nil {
 		return fmt.Errorf("ChildSetReconciler %q must implement ChildObjectManager", r.Name)
+	}
+	if validation.IsRecursive(ctx) {
+		if v, ok := r.ChildObjectManager.(validation.Validator); ok {
+			if err := v.Validate(ctx); err != nil {
+				return fmt.Errorf("ChildSetReconciler %q must have a valid ChildObjectManager: %w", r.Name, err)
+			}
+		}
 	}
 
 	return nil

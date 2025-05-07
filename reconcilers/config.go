@@ -48,6 +48,8 @@ type Config struct {
 	Discovery discovery.DiscoveryInterface
 	Recorder  record.EventRecorder
 	Tracker   tracker.Tracker
+
+	syncPeriod time.Duration
 }
 
 func (c Config) IsEmpty() bool {
@@ -62,6 +64,21 @@ func (c Config) WithCluster(cluster cluster.Cluster) Config {
 		Discovery: discovery.NewDiscoveryClientForConfigOrDie(cluster.GetConfig()),
 		Recorder:  cluster.GetEventRecorderFor("controller"),
 		Tracker:   c.Tracker,
+
+		syncPeriod: c.syncPeriod,
+	}
+}
+
+// WithTracker extends the config with a new tracker.
+func (c Config) WithTracker() Config {
+	return Config{
+		Client:    c.Client,
+		APIReader: c.APIReader,
+		Discovery: c.Discovery,
+		Recorder:  c.Recorder,
+		Tracker:   tracker.New(c.Scheme(), 2*c.syncPeriod),
+
+		syncPeriod: c.syncPeriod,
 	}
 }
 
@@ -78,6 +95,8 @@ func (c Config) WithDangerousDuckClientOperations() Config {
 		Discovery: c.Discovery,
 		Recorder:  c.Recorder,
 		Tracker:   c.Tracker,
+
+		syncPeriod: c.syncPeriod,
 	}
 }
 
@@ -132,9 +151,7 @@ func (c Config) TrackAndList(ctx context.Context, list client.ObjectList, opts .
 // NewConfig creates a Config for a specific API type. Typically passed into a
 // reconciler.
 func NewConfig(mgr ctrl.Manager, apiType client.Object, syncPeriod time.Duration) Config {
-	return Config{
-		Tracker: tracker.New(mgr.GetScheme(), 2*syncPeriod),
-	}.WithCluster(mgr)
+	return Config{syncPeriod: syncPeriod}.WithCluster(mgr).WithTracker()
 }
 
 var _ SubReconciler[client.Object] = (*WithConfig[client.Object])(nil)

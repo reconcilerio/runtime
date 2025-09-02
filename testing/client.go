@@ -204,6 +204,11 @@ func (w *clientWrapper) List(ctx context.Context, list client.ObjectList, opts .
 	return w.client.List(ctx, list, opts...)
 }
 
+func (w *clientWrapper) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+	// TODO(scothis) capture action for assertions and react before calling wrapped client
+	return w.client.Apply(ctx, obj, opts...)
+}
+
 func (w *clientWrapper) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	gvr, namespace, _, err := w.objmeta(obj)
 	if err != nil {

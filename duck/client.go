@@ -142,6 +142,10 @@ func (c *duckAwareClientWrapper) Watch(ctx context.Context, list client.ObjectLi
 	return w, nil
 }
 
+func (c *duckAwareClientWrapper) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+	return c.client.Apply(ctx, obj, opts...)
+}
+
 func (c *duckAwareClientWrapper) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	if !IsDuck(obj, c.Scheme()) {
 		return c.client.Create(ctx, obj, opts...)

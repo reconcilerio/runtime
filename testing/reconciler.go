@@ -78,6 +78,8 @@ type ReconcilerTestCase struct {
 	ExpectTracks []TrackRequest
 	// ExpectEvents holds the ordered list of events recorded during the reconciliation
 	ExpectEvents []Event
+	// ExpectApplies builds the ordered list of objects expected to be applied during reconciliation
+	ExpectApplies []ApplyRef
 	// ExpectCreates builds the ordered list of objects expected to be created during reconciliation
 	ExpectCreates []client.Object
 	// ExpectUpdates builds the ordered list of objects expected to be updated during reconciliation
@@ -201,6 +203,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 		GivenTracks:             tc.GivenTracks,
 		ExpectTracks:            tc.ExpectTracks,
 		ExpectEvents:            tc.ExpectEvents,
+		ExpectApplies:           tc.ExpectApplies,
 		ExpectCreates:           tc.ExpectCreates,
 		ExpectUpdates:           tc.ExpectUpdates,
 		ExpectPatches:           tc.ExpectPatches,

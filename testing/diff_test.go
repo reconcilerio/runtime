@@ -38,6 +38,10 @@ func (d *staticDiffer) Event(expected, actual Event) string {
 	return d.diff
 }
 
+func (d *staticDiffer) ApplyRef(expected, actual ApplyRef) string {
+	return d.diff
+}
+
 func (d *staticDiffer) PatchRef(expected, actual PatchRef) string {
 	return d.diff
 }

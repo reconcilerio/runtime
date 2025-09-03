@@ -43,6 +43,7 @@ type TestClient interface {
 type clientWrapper struct {
 	client                  client.Client
 	tracker                 clientgotesting.ObjectTracker
+	ApplyActions            []ApplyAction
 	CreateActions           []objectAction
 	UpdateActions           []objectAction
 	PatchActions            []PatchAction
@@ -60,6 +61,7 @@ func NewFakeClientWrapper(client client.Client, tracker clientgotesting.ObjectTr
 	c := &clientWrapper{
 		client:                  client,
 		tracker:                 tracker,
+		ApplyActions:            []ApplyAction{},
 		CreateActions:           []objectAction{},
 		UpdateActions:           []objectAction{},
 		PatchActions:            []PatchAction{},
@@ -205,7 +207,14 @@ func (w *clientWrapper) List(ctx context.Context, list client.ObjectList, opts .
 }
 
 func (w *clientWrapper) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
-	// TODO(scothis) capture action for assertions and react before calling wrapped client
+	// capture action
+	w.ApplyActions = append(w.ApplyActions, NewApplyAction(obj))
+
+	// call reactor chain
+	if err := w.react(NewApplyAction(obj)); err != nil {
+		return err
+	}
+
 	return w.client.Apply(ctx, obj, opts...)
 }
 

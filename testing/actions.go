@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	clientgotesting "k8s.io/client-go/testing"
 )
 
@@ -54,12 +55,14 @@ func (a ApplyActionImpl) GetApplyConfiguration() runtime.ApplyConfiguration {
 }
 
 func NewApplyAction(ac runtime.ApplyConfiguration) ApplyAction {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ac)
+	data, err := json.Marshal(ac)
 	if err != nil {
-		panic(fmt.Errorf("unable to convert from apply configuration: %w", err))
+		panic(fmt.Errorf("failed to marshal apply configuration: %w", err))
 	}
-	obj := unstructured.Unstructured{
-		Object: u,
+
+	obj := &unstructured.Unstructured{}
+	if err := json.Unmarshal(data, obj); err != nil {
+		panic(fmt.Errorf("failed to unmarshal apply configuration: %w", err))
 	}
 	gvk := obj.GetObjectKind().GroupVersionKind()
 

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -535,12 +536,17 @@ var (
 		}
 		return ptr.To[string](s.String())
 	})
-	NormalizeApplyConfiguration = cmp.Transformer("runtime.ApplyConfiguration", func(c runtime.ApplyConfiguration) map[string]interface{} {
-		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(c)
+	NormalizeApplyConfiguration = cmp.Transformer("runtime.ApplyConfiguration", func(ac runtime.ApplyConfiguration) map[string]interface{} {
+		data, err := json.Marshal(ac)
 		if err != nil {
-			panic(fmt.Errorf("unable to convert from apply configuration: %w", err))
+			panic(fmt.Errorf("failed to marshal apply configuration: %w", err))
 		}
-		return obj
+
+		obj := &unstructured.Unstructured{}
+		if err := json.Unmarshal(data, obj); err != nil {
+			panic(fmt.Errorf("failed to unmarshal apply configuration: %w", err))
+		}
+		return obj.UnstructuredContent()
 	})
 )
 

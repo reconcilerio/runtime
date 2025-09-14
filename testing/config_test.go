@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/internal/resources"
@@ -64,6 +65,11 @@ func TestExpectConfig(t *testing.T) {
 			Name:      "resource-2",
 		},
 	}
+
+	ac1 := applyconfigurationsappsv1.Deployment("resource", ns).
+		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(1))
+	ac2 := applyconfigurationsappsv1.Deployment("resource", ns).
+		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(2))
 
 	scheme := runtime.NewScheme()
 	_ = resources.AddToScheme(scheme)
@@ -420,6 +426,71 @@ func TestExpectConfig(t *testing.T) {
 				u.SetGenerateName("resource-")
 
 				c.Create(ctx, u)
+			},
+		},
+
+		"expected apply": {
+			config: ExpectConfig{
+				ExpectApplies: []ApplyRef{
+					{
+						Group:              "apps",
+						Kind:               "Deployment",
+						Namespace:          ns,
+						Name:               "resource",
+						ApplyConfiguration: ac1,
+					},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Apply(ctx, ac1)
+			},
+			failedAssertions: []string{},
+		},
+		"unexpected apply": {
+			config: ExpectConfig{
+				ExpectApplies: []ApplyRef{
+					{
+						Group:              "apps",
+						Kind:               "Deployment",
+						Namespace:          ns,
+						Name:               "resource",
+						ApplyConfiguration: ac2,
+					},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Apply(ctx, ac1)
+			},
+			failedAssertions: []string{
+				`ExpectApplies[0] differs for config "test" (-expected, +actual):`,
+			},
+		},
+		"extra apply": {
+			config: ExpectConfig{
+				ExpectApplies: []ApplyRef{},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Apply(ctx, ac1)
+			},
+			failedAssertions: []string{
+				`Unexpected Apply observed for config "test": `,
+			},
+		},
+		"missing apply": {
+			config: ExpectConfig{
+				ExpectApplies: []ApplyRef{
+					{
+						Group:              "apps",
+						Kind:               "Deployment",
+						Namespace:          ns,
+						Name:               "resource",
+						ApplyConfiguration: ac1,
+					},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {},
+			failedAssertions: []string{
+				`ExpectApplies[0] not observed for config "test": `,
 			},
 		},
 
@@ -841,7 +912,7 @@ func TestExpectConfig(t *testing.T) {
 			c.AssertExpectations(nil)
 
 			if expected, actual := len(tc.failedAssertions), len(c.observedErrors); expected != actual {
-				t.Errorf("unexpected config assertions, wanted %d, got %d", expected, actual)
+				t.Errorf("unexpected config assertions, wanted %d, got %d: %#v", expected, actual, c.observedErrors)
 			}
 			for i := range tc.failedAssertions {
 				expected, actual := tc.failedAssertions[i], c.observedErrors[i]
@@ -1055,6 +1126,44 @@ func TestIgnoreResourceVersion(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			diff := cmp.Diff(tc.a, tc.b, IgnoreResourceVersion)
+			actual := diff != ""
+			expected := tc.hasDiff
+			if actual != expected {
+				t.Errorf("unexpected diff: %s", diff)
+			}
+		})
+	}
+}
+
+func TestNormalizeApplyConfiguration(t *testing.T) {
+	ac1 := applyconfigurationsappsv1.Deployment("resource", "test-ns").
+		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(1))
+	ac2 := applyconfigurationsappsv1.Deployment("resource", "test-ns").
+		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(2))
+
+	tests := map[string]struct {
+		a       runtime.ApplyConfiguration
+		b       runtime.ApplyConfiguration
+		hasDiff bool
+	}{
+		"nil": {
+			a: nil,
+			b: nil,
+		},
+		"same": {
+			a: ac1,
+			b: ac1,
+		},
+		"delta": {
+			a:       ac1,
+			b:       ac2,
+			hasDiff: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			diff := cmp.Diff(tc.a, tc.b, NormalizeApplyConfiguration)
 			actual := diff != ""
 			expected := tc.hasDiff
 			if actual != expected {

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -88,6 +89,8 @@ type ExpectConfig struct {
 	ExpectTracks []TrackRequest
 	// ExpectEvents holds the ordered list of events recorded during the reconciliation
 	ExpectEvents []Event
+	// ExpectApplies builds the ordered list of objects expected to be applied during reconciliation
+	ExpectApplies []ApplyRef
 	// ExpectCreates builds the ordered list of objects expected to be created during reconciliation
 	ExpectCreates []client.Object
 	// ExpectUpdates builds the ordered list of objects expected to be updated during reconciliation
@@ -243,6 +246,7 @@ func (c *ExpectConfig) AssertClientExpectations(t *testing.T) {
 	}
 	c.init()
 
+	c.AssertClientApplyExpectations(t)
 	c.AssertClientCreateExpectations(t)
 	c.AssertClientUpdateExpectations(t)
 	c.AssertClientPatchExpectations(t)
@@ -250,6 +254,31 @@ func (c *ExpectConfig) AssertClientExpectations(t *testing.T) {
 	c.AssertClientDeleteCollectionExpectations(t)
 	c.AssertClientStatusUpdateExpectations(t)
 	c.AssertClientStatusPatchExpectations(t)
+}
+
+// AssertClientApplyExpectations asserts observed reconciler client create behavior matches the expected client create behavior
+func (c *ExpectConfig) AssertClientApplyExpectations(t *testing.T) {
+	if t != nil {
+		t.Helper()
+	}
+	c.init()
+
+	for i, exp := range c.ExpectApplies {
+		if i >= len(c.client.ApplyActions) {
+			c.errorf(t, "ExpectApplies[%d] not observed%s: %#v", i, c.configNameMsg(), exp)
+			continue
+		}
+		actual := NewApplyRef(c.client.ApplyActions[i])
+
+		if diff := c.Differ.ApplyRef(exp, actual); diff != "" {
+			c.errorf(t, "ExpectApplies[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
+		}
+	}
+	if actual, expected := len(c.client.ApplyActions), len(c.ExpectApplies); actual > expected {
+		for _, extra := range c.client.ApplyActions[expected:] {
+			c.errorf(t, "Unexpected Apply observed%s: %#v", c.configNameMsg(), extra)
+		}
+	}
 }
 
 // AssertClientCreateExpectations asserts observed reconciler client create behavior matches the expected client create behavior
@@ -507,6 +536,18 @@ var (
 		}
 		return ptr.To[string](s.String())
 	})
+	NormalizeApplyConfiguration = cmp.Transformer("runtime.ApplyConfiguration", func(ac runtime.ApplyConfiguration) map[string]interface{} {
+		data, err := json.Marshal(ac)
+		if err != nil {
+			panic(fmt.Errorf("failed to marshal apply configuration: %w", err))
+		}
+
+		obj := &unstructured.Unstructured{}
+		if err := json.Unmarshal(data, obj); err != nil {
+			panic(fmt.Errorf("failed to unmarshal apply configuration: %w", err))
+		}
+		return obj.UnstructuredContent()
+	})
 )
 
 type PatchRef struct {
@@ -580,5 +621,23 @@ func NewDeleteCollectionRef(action DeleteCollectionAction) DeleteCollectionRef {
 		Namespace: action.GetNamespace(),
 		Labels:    action.GetListRestrictions().Labels,
 		Fields:    action.GetListRestrictions().Fields,
+	}
+}
+
+type ApplyRef struct {
+	Group              string
+	Kind               string
+	Namespace          string
+	Name               string
+	ApplyConfiguration runtime.ApplyConfiguration
+}
+
+func NewApplyRef(action ApplyAction) ApplyRef {
+	return ApplyRef{
+		Group:              action.GetResource().Group,
+		Kind:               action.GetResource().Resource,
+		Namespace:          action.GetNamespace(),
+		Name:               action.GetName(),
+		ApplyConfiguration: action.GetApplyConfiguration(),
 	}
 }

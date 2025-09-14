@@ -28,6 +28,7 @@ type Differ interface {
 	Result(expected, actual reconcilers.Result) string
 	TrackRequest(expected, actual TrackRequest) string
 	Event(expected, actual Event) string
+	ApplyRef(expected, actual ApplyRef) string
 	PatchRef(expected, actual PatchRef) string
 	DeleteRef(expected, actual DeleteRef) string
 	DeleteCollectionRef(expected, actual DeleteCollectionRef) string
@@ -55,6 +56,10 @@ func (*differ) TrackRequest(expected, actual TrackRequest) string {
 
 func (*differ) Event(expected, actual Event) string {
 	return cmp.Diff(expected, actual)
+}
+
+func (*differ) ApplyRef(expected, actual ApplyRef) string {
+	return cmp.Diff(expected, actual, NormalizeApplyConfiguration)
 }
 
 func (*differ) PatchRef(expected, actual PatchRef) string {

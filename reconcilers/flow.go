@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/utils/ptr"
+	"reconciler.io/runtime/stash"
 	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -164,7 +165,7 @@ func (err *ErrMaxIterations) Error() string {
 	return fmt.Sprintf("exceeded max iterations: %d", err.Iterations)
 }
 
-const iterationStashKey StashKey = "reconciler.io/runtime:iteration"
+const iterationStashKey stash.Key = "reconciler.io/runtime:iteration"
 
 func stashIteration(ctx context.Context, i int) context.Context {
 	return context.WithValue(ctx, iterationStashKey, i)
@@ -426,11 +427,11 @@ type Cursor[I any] struct {
 }
 
 // CursorStasher creates a Stasher for a Cursor of the generic type
-func CursorStasher[I any]() Stasher[Cursor[I]] {
+func CursorStasher[I any]() stash.Stasher[Cursor[I]] {
 	// avoid key collisions for nested iteration over different types
 	var empty I
-	key := StashKey(fmt.Sprintf("reconciler.io/runtime:cursor:%s", typeName(empty)))
-	return NewStasher[Cursor[I]](key)
+	key := stash.Key(fmt.Sprintf("reconciler.io/runtime:cursor:%s", typeName(empty)))
+	return stash.New[Cursor[I]](key)
 }
 
 // TryCatch facilitates recovery from errors encountered within the Try

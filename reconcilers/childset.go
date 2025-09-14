@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/stash"
 	"reconciler.io/runtime/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -407,11 +408,11 @@ func (r *ChildSetResult[T]) AggregateError() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-func childSetResultStasher[T client.Object]() Stasher[ChildSetResult[T]] {
-	return NewStasher[ChildSetResult[T]]("reconciler.io/runtime:childSetResult")
+func childSetResultStasher[T client.Object]() stash.Stasher[ChildSetResult[T]] {
+	return stash.New[ChildSetResult[T]]("reconciler.io/runtime:childSetResult")
 }
 
-const knownChildrenStashKey StashKey = "reconciler.io/runtime:knownChildren"
+const knownChildrenStashKey stash.Key = "reconciler.io/runtime:knownChildren"
 
 // RetrieveKnownChildren returns a copy of the children managed by current ChildSetReconciler. The
 // known children can be returned from the DesiredChildren method to preserve existing children, or

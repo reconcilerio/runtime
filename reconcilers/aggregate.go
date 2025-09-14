@@ -34,6 +34,7 @@ import (
 
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/stash"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/tracker"
 	"reconciler.io/runtime/validation"
@@ -227,7 +228,7 @@ func (r *AggregateReconciler[T]) Reconcile(ctx context.Context, req Request) (Re
 		return Result{}, nil
 	}
 
-	ctx = WithStash(ctx)
+	ctx = stash.WithContext(ctx)
 
 	c := r.Config
 

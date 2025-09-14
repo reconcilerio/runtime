@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/stash"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -174,7 +175,7 @@ func (r *AdmissionWebhookAdapter[T]) withContext(ctx context.Context) context.Co
 		WithName(r.Name)
 	ctx = logr.NewContext(ctx, log)
 
-	ctx = WithStash(ctx)
+	ctx = stash.WithContext(ctx)
 
 	ctx = StashConfig(ctx, r.Config)
 	ctx = StashOriginalConfig(ctx, r.Config)
@@ -287,9 +288,9 @@ func (r *AdmissionWebhookAdapter[T]) reconcile(ctx context.Context, req admissio
 }
 
 const (
-	admissionRequestStashKey  StashKey = "reconciler.io/runtime:admission-request"
-	admissionResponseStashKey StashKey = "reconciler.io/runtime:admission-response"
-	httpRequestStashKey       StashKey = "reconciler.io/runtime:http-request"
+	admissionRequestStashKey  stash.Key = "reconciler.io/runtime:admission-request"
+	admissionResponseStashKey stash.Key = "reconciler.io/runtime:admission-response"
+	httpRequestStashKey       stash.Key = "reconciler.io/runtime:http-request"
 )
 
 func StashAdmissionRequest(ctx context.Context, req admission.Request) context.Context {

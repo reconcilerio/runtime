@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/internal"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -147,14 +148,14 @@ func (h *ObjectManagerReconcilerTestHarness[T]) Reconcile(ctx context.Context, r
 	return reconcilers.Result{}, err
 }
 
-func ObjectManagerReconcilerTestHarnessActualStasher[T client.Object]() reconcilers.Stasher[T] {
-	return reconcilers.NewStasher[T]("reconciler.io/object-manager-reconciler-test-harness-actual")
+func ObjectManagerReconcilerTestHarnessActualStasher[T client.Object]() stash.Stasher[T] {
+	return stash.New[T]("reconciler.io/object-manager-reconciler-test-harness-actual")
 }
 
-func ObjectManagerReconcilerTestHarnessDesiredStasher[T client.Object]() reconcilers.Stasher[T] {
-	return reconcilers.NewStasher[T]("reconciler.io/object-manager-reconciler-test-harness-desired")
+func ObjectManagerReconcilerTestHarnessDesiredStasher[T client.Object]() stash.Stasher[T] {
+	return stash.New[T]("reconciler.io/object-manager-reconciler-test-harness-desired")
 }
 
-func ObjectManagerReconcilerTestHarnessResultStasher[T client.Object]() reconcilers.Stasher[T] {
-	return reconcilers.NewStasher[T]("reconciler.io/object-manager-reconciler-test-harness-result")
+func ObjectManagerReconcilerTestHarnessResultStasher[T client.Object]() stash.Stasher[T] {
+	return stash.New[T]("reconciler.io/object-manager-reconciler-test-harness-result")
 }

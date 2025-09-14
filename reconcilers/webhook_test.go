@@ -38,6 +38,7 @@ import (
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	rtesting "reconciler.io/runtime/testing"
 	"reconciler.io/runtime/tracker"
 	"reconciler.io/runtime/validation"
@@ -321,8 +322,8 @@ func TestAdmissionWebhookAdapter(t *testing.T) {
 					return reconcilers.Sequence[*resources.TestResource]{
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							Sync: func(ctx context.Context, _ *resources.TestResource) error {
-								// StashValue will panic if context is not setup for stashing
-								reconcilers.StashValue(ctx, reconcilers.StashKey("greeting"), "hello")
+								// StoreValue will panic if context is not setup for stashing
+								stash.StoreValue(ctx, stash.Key("greeting"), "hello")
 
 								return nil
 							},
@@ -330,7 +331,7 @@ func TestAdmissionWebhookAdapter(t *testing.T) {
 						&reconcilers.SyncReconciler[*resources.TestResource]{
 							Sync: func(ctx context.Context, _ *resources.TestResource) error {
 								// StashValue will panic if context is not setup for stashing
-								greeting := reconcilers.RetrieveValue(ctx, reconcilers.StashKey("greeting"))
+								greeting := stash.RetrieveValue(ctx, stash.Key("greeting"))
 								if greeting != "hello" {
 									t.Errorf("unexpected stash value retrieved")
 								}
@@ -352,7 +353,7 @@ func TestAdmissionWebhookAdapter(t *testing.T) {
 				AdmissionResponse: response.DieRelease(),
 			},
 			Prepare: func(t *testing.T, ctx context.Context, tc *rtesting.AdmissionWebhookTestCase) (context.Context, error) {
-				key := reconcilers.StashKey("test-key")
+				key := stash.Key("test-key")
 				value := "test-value"
 				ctx = context.WithValue(ctx, key, value)
 

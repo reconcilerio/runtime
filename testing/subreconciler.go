@@ -30,6 +30,7 @@ import (
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,7 +54,7 @@ type SubReconcilerTestCase[Type client.Object] struct {
 	// Resource is the initial object passed to the sub reconciler
 	Resource Type
 	// GivenStashedValues adds these items to the stash passed into the reconciler. Factories are resolved to their object.
-	GivenStashedValues map[reconcilers.StashKey]interface{}
+	GivenStashedValues map[stash.Key]interface{}
 	// WithClientBuilder allows a test to modify the fake client initialization.
 	WithClientBuilder func(*fake.ClientBuilder) *fake.ClientBuilder
 	// WithReactors installs each ReactionFunc into each fake clientset. ReactionFuncs intercept
@@ -82,7 +83,7 @@ type SubReconcilerTestCase[Type client.Object] struct {
 	// ExpectResource is the expected reconciled resource as mutated after the sub reconciler, or nil if no modification
 	ExpectResource Type
 	// ExpectStashedValues ensures each value is stashed. Values in the stash that are not expected are ignored. Factories are resolved to their object.
-	ExpectStashedValues map[reconcilers.StashKey]interface{}
+	ExpectStashedValues map[stash.Key]interface{}
 	// VerifyStashedValue is an optional, custom verification function for stashed values
 	VerifyStashedValue VerifyStashedValueFunc
 	// ExpectTracks holds the ordered list of Track calls expected during reconciliation
@@ -166,7 +167,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		t.SkipNow()
 	}
 
-	ctx := reconcilers.WithStash(context.Background())
+	ctx := stash.WithContext(context.Background())
 	if tc.Now == (time.Time{}) {
 		tc.Now = time.Now()
 	}
@@ -187,7 +188,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 
 	// Set func for verifying stashed values
 	if tc.VerifyStashedValue == nil {
-		tc.VerifyStashedValue = func(t *testing.T, key reconcilers.StashKey, expected, actual interface{}) {
+		tc.VerifyStashedValue = func(t *testing.T, key stash.Key, expected, actual interface{}) {
 			if internal.IsNil(expected) && internal.IsNil(actual) {
 				return
 			}
@@ -255,7 +256,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		if f, ok := v.(runtime.Object); ok {
 			v = f.DeepCopyObject()
 		}
-		reconcilers.StashValue(ctx, k, v)
+		stash.StoreValue(ctx, k, v)
 	}
 
 	ctx = reconcilers.StashConfig(ctx, c)
@@ -324,7 +325,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		if f, ok := expected.(runtime.Object); ok {
 			expected = f.DeepCopyObject()
 		}
-		actual := reconcilers.RetrieveValue(ctx, key)
+		actual := stash.RetrieveValue(ctx, key)
 		tc.VerifyStashedValue(t, key, expected, actual)
 	}
 

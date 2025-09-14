@@ -40,6 +40,7 @@ import (
 
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
+	"reconciler.io/runtime/stash"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/validation"
 )
@@ -264,7 +265,7 @@ func (r *ResourceReconciler[T]) Validate(ctx context.Context) error {
 func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Result, error) {
 	r.init()
 
-	ctx = WithStash(ctx)
+	ctx = stash.WithContext(ctx)
 
 	c := r.Config
 

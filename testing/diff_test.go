@@ -18,6 +18,7 @@ package testing
 
 import (
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -54,7 +55,7 @@ func (d *staticDiffer) DeleteCollectionRef(expected, actual DeleteCollectionRef)
 	return d.diff
 }
 
-func (d *staticDiffer) StashedValue(expected, actual any, key reconcilers.StashKey) string {
+func (d *staticDiffer) StashedValue(expected, actual any, key stash.Key) string {
 	return d.diff
 }
 

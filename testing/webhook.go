@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -169,7 +170,7 @@ func (tc *AdmissionWebhookTestCase) RunWithContext(t *testing.T, scheme *runtime
 		t.SkipNow()
 	}
 
-	ctx := reconcilers.WithStash(context.Background())
+	ctx := stash.WithContext(context.Background())
 	if tc.Now == (time.Time{}) {
 		tc.Now = time.Now()
 	}

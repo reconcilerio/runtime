@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -130,7 +131,7 @@ type ReconcilerTestCase struct {
 type VerifyFunc func(t *testing.T, result reconcilers.Result, err error)
 
 // VerifyStashedValueFunc is a verification function for the entries in the stash
-type VerifyStashedValueFunc func(t *testing.T, key reconcilers.StashKey, expected, actual interface{})
+type VerifyStashedValueFunc func(t *testing.T, key stash.Key, expected, actual interface{})
 
 // ReconcilerTests represents a map of reconciler test cases. The map key is the name of each test
 // case. Test cases are executed in random order.

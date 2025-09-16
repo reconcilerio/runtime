@@ -38,6 +38,7 @@ import (
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	rtesting "reconciler.io/runtime/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -112,11 +113,11 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenConfigMap.DieReleasePtr(),
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenConfigMap.DieReleasePtr(),
 			},
 		},
@@ -125,7 +126,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  nil,
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
@@ -135,7 +136,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ExpectCreates: []client.Object{
 				desiredConfigMap,
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredConfigMap.DieReleasePtr(),
 			},
 		},
@@ -144,7 +145,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  diecorev1.ConfigMapBlank.DieDefaultTypeMetadata().DieReleasePtr(),
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
@@ -154,7 +155,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ExpectCreates: []client.Object{
 				desiredConfigMap,
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredConfigMap.DieReleasePtr(),
 			},
 		},
@@ -163,7 +164,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  nil,
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
@@ -177,7 +178,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ExpectCreates: []client.Object{
 				desiredConfigMap,
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -186,7 +187,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenConfigMap.
 					AddData("foo", "bar").
 					DieReleasePtr(),
@@ -198,7 +199,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ExpectUpdates: []client.Object{
 				desiredConfigMap,
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredConfigMap.DieReleasePtr(),
 			},
 		},
@@ -207,7 +208,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenConfigMap.
 					AddData("foo", "bar").
 					DieReleasePtr(),
@@ -223,7 +224,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ExpectUpdates: []client.Object{
 				desiredConfigMap,
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -232,7 +233,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenConfigMap.
 					AddData("foo", "bar").
 					DieReleasePtr(),
@@ -244,7 +245,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(givenConfigMap, scheme),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -253,7 +254,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenConfigMap.
 					AddData("foo", "bar").
 					DieReleasePtr(),
@@ -269,7 +270,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(givenConfigMap, scheme),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -284,11 +285,11 @@ func TestUpdatingObjectManager(t *testing.T) {
 					withFinalizer(testFinalizer),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenConfigMap.DieReleasePtr(),
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenConfigMap.DieReleasePtr(),
 			},
 		},
@@ -299,7 +300,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 					withFinalizer(testFinalizer),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenConfigMap.DieReleasePtr(),
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
@@ -323,7 +324,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 					Patch:       []byte(`{"metadata":{"finalizers":["test-finalizer"],"resourceVersion":"999"}}`),
 				},
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenConfigMap.DieReleasePtr(),
 			},
 		},
@@ -338,7 +339,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 					withFinalizer(testFinalizer),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  nil,
 				desiredStashKey: nil,
 			},
@@ -362,7 +363,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 					Patch:       []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
 				},
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -373,14 +374,14 @@ func TestUpdatingObjectManager(t *testing.T) {
 					withTrackDesired(true),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenConfigMap.DieReleasePtr(),
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
 			ExpectTracks: []rtesting.TrackRequest{
 				rtesting.NewTrackRequest(givenConfigMap, resource, scheme),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenConfigMap.DieReleasePtr(),
 			},
 		},
@@ -391,7 +392,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 					withTrackDesired(true),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: nil,
 				desiredStashKey: desiredConfigMap.
 					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
@@ -413,7 +414,7 @@ func TestUpdatingObjectManager(t *testing.T) {
 						d.GenerateName(testName + "-")
 					}),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredConfigMap.
 					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 						d.Name(testName + "-001")
@@ -434,14 +435,14 @@ func TestUpdatingObjectManager(t *testing.T) {
 					}),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenConfigMap.
 					Immutable(ptr.To[bool](true)).
 					AddData("foo", "bar").
 					DieReleasePtr(),
 				desiredStashKey: desiredConfigMap.DieReleasePtr(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenConfigMap.
 					Immutable(ptr.To[bool](true)).
 					AddData("foo", "bar").
@@ -532,11 +533,11 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenTestDuck.DieReleasePtr(),
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenTestDuck.DieReleasePtr(),
 			},
 		},
@@ -545,7 +546,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  nil,
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
@@ -555,7 +556,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			ExpectCreates: []client.Object{
 				desiredTestDuck.DieReleaseUnstructured(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredTestDuck.DieReleasePtr(),
 			},
 		},
@@ -564,7 +565,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  dies.TestDuckBlank.APIVersion("example.com").Kind("Test").DieReleasePtr(),
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
@@ -574,7 +575,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			ExpectCreates: []client.Object{
 				desiredTestDuck.DieReleaseUnstructured(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredTestDuck.DieReleasePtr(),
 			},
 		},
@@ -583,7 +584,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  nil,
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
@@ -597,7 +598,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			ExpectCreates: []client.Object{
 				desiredTestDuck.DieReleaseUnstructured(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -606,7 +607,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenTestDuck.
 					SpecDie(func(d *dies.TestDuckSpecDie) {
 						d.AddField("foo", "bar")
@@ -620,7 +621,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			ExpectUpdates: []client.Object{
 				desiredTestDuck.DieReleaseUnstructured(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredTestDuck.DieReleasePtr(),
 			},
 		},
@@ -629,7 +630,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenTestDuck.
 					SpecDie(func(d *dies.TestDuckSpecDie) {
 						d.AddField("foo", "bar")
@@ -647,7 +648,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			ExpectUpdates: []client.Object{
 				desiredTestDuck.DieReleaseUnstructured(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -656,7 +657,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenTestDuck.
 					SpecDie(func(d *dies.TestDuckSpecDie) {
 						d.AddField("foo", "bar")
@@ -670,7 +671,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(givenTestDuck, scheme),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -679,7 +680,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			Metadata: map[string]any{
 				"ObjectManager": makeUpdatingObjectManager(),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenTestDuck.
 					SpecDie(func(d *dies.TestDuckSpecDie) {
 						d.AddField("foo", "bar")
@@ -697,7 +698,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 			ExpectDeletes: []rtesting.DeleteRef{
 				rtesting.NewDeleteRefFromObject(givenTestDuck, scheme),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -712,11 +713,11 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					withFinalizer(testFinalizer),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenTestDuck.DieReleasePtr(),
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenTestDuck.DieReleasePtr(),
 			},
 		},
@@ -727,7 +728,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					withFinalizer(testFinalizer),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenTestDuck.DieReleasePtr(),
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
@@ -751,7 +752,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					Patch:       []byte(`{"metadata":{"finalizers":["test-finalizer"],"resourceVersion":"999"}}`),
 				},
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenTestDuck.DieReleasePtr(),
 			},
 		},
@@ -766,7 +767,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					withFinalizer(testFinalizer),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  nil,
 				desiredStashKey: nil,
 			},
@@ -790,7 +791,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					Patch:       []byte(`{"metadata":{"finalizers":null,"resourceVersion":"999"}}`),
 				},
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: nil,
 			},
 		},
@@ -801,14 +802,14 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					withTrackDesired(true),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey:  givenTestDuck.DieReleasePtr(),
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
 			ExpectTracks: []rtesting.TrackRequest{
 				rtesting.NewTrackRequest(givenTestDuck, resource, scheme),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenTestDuck.DieReleasePtr(),
 			},
 		},
@@ -819,7 +820,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					withTrackDesired(true),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: nil,
 				desiredStashKey: desiredTestDuck.
 					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
@@ -842,7 +843,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					}).
 					DieReleaseUnstructured(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: desiredTestDuck.
 					MetadataDie(func(d *diemetav1.ObjectMetaDie) {
 						d.Name(testName + "-001")
@@ -863,7 +864,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					}),
 				),
 			},
-			GivenStashedValues: map[reconcilers.StashKey]any{
+			GivenStashedValues: map[stash.Key]any{
 				actualStashKey: givenTestDuck.
 					SpecDie(func(d *dies.TestDuckSpecDie) {
 						d.Immutable(ptr.To[bool](true))
@@ -872,7 +873,7 @@ func TestUpdatingObjectManager_Duck(t *testing.T) {
 					DieReleasePtr(),
 				desiredStashKey: desiredTestDuck.DieReleasePtr(),
 			},
-			ExpectStashedValues: map[reconcilers.StashKey]interface{}{
+			ExpectStashedValues: map[stash.Key]interface{}{
 				resultStashKey: givenTestDuck.
 					SpecDie(func(d *dies.TestDuckSpecDie) {
 						d.Immutable(ptr.To[bool](true))

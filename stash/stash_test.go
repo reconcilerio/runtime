@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package reconcilers
+package stash
 
 import (
 	"testing"
@@ -46,11 +46,11 @@ func TestStash(t *testing.T) {
 		},
 	}
 
-	var key StashKey = "stash-key"
-	ctx := WithStash(context.Background())
+	var key Key = "stash-key"
+	ctx := WithContext(context.Background())
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
-			StashValue(ctx, key, c.value)
+			StoreValue(ctx, key, c.value)
 			if expected, actual := c.value, RetrieveValue(ctx, key); !equality.Semantic.DeepEqual(expected, actual) {
 				t.Errorf("%s: unexpected stash value, actually = %v, expected = %v", c.name, actual, expected)
 			}
@@ -60,7 +60,7 @@ func TestStash(t *testing.T) {
 
 func TestStash_StashValue_UndecoratedContext(t *testing.T) {
 	ctx := context.Background()
-	var key StashKey = "stash-key"
+	var key Key = "stash-key"
 	value := "value"
 
 	defer func() {
@@ -68,12 +68,12 @@ func TestStash_StashValue_UndecoratedContext(t *testing.T) {
 			t.Error("expected StashValue() to panic")
 		}
 	}()
-	StashValue(ctx, key, value)
+	StoreValue(ctx, key, value)
 }
 
 func TestStash_RetrieveValue_UndecoratedContext(t *testing.T) {
 	ctx := context.Background()
-	var key StashKey = "stash-key"
+	var key Key = "stash-key"
 
 	defer func() {
 		if r := recover(); r == nil {
@@ -84,8 +84,8 @@ func TestStash_RetrieveValue_UndecoratedContext(t *testing.T) {
 }
 
 func TestStash_RetrieveValue_Undefined(t *testing.T) {
-	ctx := WithStash(context.Background())
-	var key StashKey = "stash-key"
+	ctx := WithContext(context.Background())
+	var key Key = "stash-key"
 
 	if value := RetrieveValue(ctx, key); value != nil {
 		t.Error("expected RetrieveValue() to return nil for undefined key")
@@ -93,11 +93,11 @@ func TestStash_RetrieveValue_Undefined(t *testing.T) {
 }
 
 func TestStasher(t *testing.T) {
-	ctx := WithStash(context.Background())
-	stasher := NewStasher[string]("my-key")
+	ctx := WithContext(context.Background())
+	stasher := New[string]("my-key")
 
-	if key := stasher.Key(); key != StashKey("my-key") {
-		t.Errorf("expected key to be %q got %q", StashKey("my-key"), key)
+	if key := stasher.Key(); key != Key("my-key") {
+		t.Errorf("expected key to be %q got %q", Key("my-key"), key)
 	}
 
 	t.Run("no value", func(t *testing.T) {
@@ -151,7 +151,7 @@ func TestStasher(t *testing.T) {
 		if value := stasher.RetrieveOrEmpty(ctx); value != "hello world" {
 			t.Errorf("expected value to be %q got %q", "hello world", value)
 		}
-		altCtx := WithStash(context.Background())
+		altCtx := WithContext(context.Background())
 		if value := stasher.RetrieveOrEmpty(altCtx); value != "" {
 			t.Error("expected value to be empty")
 		}

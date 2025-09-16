@@ -34,6 +34,7 @@ import (
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	rtesting "reconciler.io/runtime/testing"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/validation"
@@ -328,9 +329,9 @@ func TestAggregateReconciler(t *testing.T) {
 					r := defaultAggregateReconciler(c)
 					r.Reconciler = &reconcilers.SyncReconciler[*corev1.ConfigMap]{
 						Sync: func(ctx context.Context, resource *corev1.ConfigMap) error {
-							var key reconcilers.StashKey = "foo"
+							var key stash.Key = "foo"
 							// StashValue will panic if the context is not setup correctly
-							reconcilers.StashValue(ctx, key, "bar")
+							stash.StoreValue(ctx, key, "bar")
 							return nil
 						},
 					}
@@ -626,8 +627,8 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 		{
 			name: "valid reconciler",
 			reconciler: &reconcilers.AggregateReconciler[*resources.TestResource]{
-				Type:       &resources.TestResource{},
-				Request:    req,
+				Type:    &resources.TestResource{},
+				Request: req,
 				Reconciler: &reconcilers.SyncReconciler[*resources.TestResource]{
 					Sync: func(ctx context.Context, resource *resources.TestResource) error {
 						return nil
@@ -650,7 +651,7 @@ func TestAggregateReconciler_Validate(t *testing.T) {
 				AggregateObjectManager: &reconcilers.UpdatingObjectManager[*resources.TestResource]{},
 			},
 			validateNested: true,
-			shouldErr: `AggregateReconciler "TestResourceAggregateReconciler" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
+			shouldErr:      `AggregateReconciler "TestResourceAggregateReconciler" must have a valid Reconciler: SyncReconciler "SyncReconciler" must implement Sync or SyncWithResult`,
 		},
 	}
 

@@ -35,6 +35,7 @@ import (
 	"reconciler.io/runtime/internal/resources"
 	"reconciler.io/runtime/internal/resources/dies"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	rtesting "reconciler.io/runtime/testing"
 	rtime "reconciler.io/runtime/time"
 	"reconciler.io/runtime/validation"
@@ -696,9 +697,9 @@ func TestResourceReconciler_Duck(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestDuck] {
 					return &reconcilers.SyncReconciler[*resources.TestDuck]{
 						Sync: func(ctx context.Context, resource *resources.TestDuck) error {
-							var key reconcilers.StashKey = "foo"
-							// StashValue will panic if the context is not setup correctly
-							reconcilers.StashValue(ctx, key, "bar")
+							var key stash.Key = "foo"
+							// StoreValue will panic if the context is not setup correctly
+							stash.StoreValue(ctx, key, "bar")
 							return nil
 						},
 					}
@@ -1206,9 +1207,9 @@ func TestResourceReconciler(t *testing.T) {
 				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
 					return &reconcilers.SyncReconciler[*resources.TestResource]{
 						Sync: func(ctx context.Context, resource *resources.TestResource) error {
-							var key reconcilers.StashKey = "foo"
-							// StashValue will panic if the context is not setup correctly
-							reconcilers.StashValue(ctx, key, "bar")
+							var key stash.Key = "foo"
+							// StoreValue will panic if the context is not setup correctly
+							stash.StoreValue(ctx, key, "bar")
 							return nil
 						},
 					}

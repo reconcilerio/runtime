@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"reconciler.io/runtime/reconcilers"
+	"reconciler.io/runtime/stash"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -32,7 +33,7 @@ type Differ interface {
 	PatchRef(expected, actual PatchRef) string
 	DeleteRef(expected, actual DeleteRef) string
 	DeleteCollectionRef(expected, actual DeleteCollectionRef) string
-	StashedValue(expected, actual any, key reconcilers.StashKey) string
+	StashedValue(expected, actual any, key stash.Key) string
 	Resource(expected, actual client.Object) string
 	ResourceStatusUpdate(expected, actual client.Object) string
 	ResourceUpdate(expected, actual client.Object) string
@@ -74,7 +75,7 @@ func (*differ) DeleteCollectionRef(expected, actual DeleteCollectionRef) string 
 	return cmp.Diff(expected, actual, NormalizeLabelSelector, NormalizeFieldSelector)
 }
 
-func (*differ) StashedValue(expected, actual any, key reconcilers.StashKey) string {
+func (*differ) StashedValue(expected, actual any, key stash.Key) string {
 	return cmp.Diff(expected, actual, reconcilers.IgnoreAllUnexported,
 		IgnoreLastTransitionTime,
 		IgnoreTypeMeta,

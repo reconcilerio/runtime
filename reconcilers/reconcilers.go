@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"reconciler.io/runtime/stash"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,12 +57,12 @@ var (
 	ErrHaltSubReconcilers = fmt.Errorf("stop processing SubReconcilers, without returning an error: %w", ErrQuiet)
 )
 
-const requestStashKey StashKey = "reconciler.io/runtime:request"
-const configStashKey StashKey = "reconciler.io/runtime:config"
-const originalConfigStashKey StashKey = "reconciler.io/runtime:originalConfig"
-const resourceTypeStashKey StashKey = "reconciler.io/runtime:resourceType"
-const originalResourceTypeStashKey StashKey = "reconciler.io/runtime:originalResourceType"
-const additionalConfigsStashKey StashKey = "reconciler.io/runtime:additionalConfigs"
+const requestStashKey stash.Key = "reconciler.io/runtime:request"
+const configStashKey stash.Key = "reconciler.io/runtime:config"
+const originalConfigStashKey stash.Key = "reconciler.io/runtime:originalConfig"
+const resourceTypeStashKey stash.Key = "reconciler.io/runtime:resourceType"
+const originalResourceTypeStashKey stash.Key = "reconciler.io/runtime:originalResourceType"
+const additionalConfigsStashKey stash.Key = "reconciler.io/runtime:additionalConfigs"
 
 func StashRequest(ctx context.Context, req Request) context.Context {
 	return context.WithValue(ctx, requestStashKey, req)

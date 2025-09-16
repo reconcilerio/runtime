@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package reconcilers
+package stash
 
 import (
 	"context"
@@ -24,39 +24,39 @@ import (
 
 const stashNonce string = "controller-stash-nonce"
 
-type stashMap map[StashKey]interface{}
+type stashMap map[Key]interface{}
 
-func WithStash(ctx context.Context) context.Context {
+func WithContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, stashNonce, stashMap{})
 }
 
-type StashKey string
+type Key string
 
 func retrieveStashMap(ctx context.Context) stashMap {
 	stash, ok := ctx.Value(stashNonce).(stashMap)
 	if !ok {
-		panic(fmt.Errorf("context not configured for stashing, call `ctx = WithStash(ctx)`"))
+		panic(fmt.Errorf("context not configured for stashing, call `ctx = WithContext(ctx)` before use"))
 	}
 	return stash
 }
 
-func StashValue(ctx context.Context, key StashKey, value interface{}) {
+func StoreValue(ctx context.Context, key Key, value interface{}) {
 	stash := retrieveStashMap(ctx)
 	stash[key] = value
 }
 
-func HasValue(ctx context.Context, key StashKey) bool {
+func HasValue(ctx context.Context, key Key) bool {
 	stash := retrieveStashMap(ctx)
 	_, ok := stash[key]
 	return ok
 }
 
-func RetrieveValue(ctx context.Context, key StashKey) interface{} {
+func RetrieveValue(ctx context.Context, key Key) interface{} {
 	stash := retrieveStashMap(ctx)
 	return stash[key]
 }
 
-func ClearValue(ctx context.Context, key StashKey) interface{} {
+func ClearValue(ctx context.Context, key Key) interface{} {
 	stash := retrieveStashMap(ctx)
 	value := stash[key]
 	delete(stash, key)
@@ -67,7 +67,7 @@ func ClearValue(ctx context.Context, key StashKey) interface{} {
 // with a stash via WithStash(). The stash is pre-configured for the context within a reconciler.
 type Stasher[T any] interface {
 	// Key is the stash key used to store and retrieve the value
-	Key() StashKey
+	Key() Key
 
 	// Store saves the value in the stash under the key
 	Store(ctx context.Context, value T)
@@ -88,23 +88,23 @@ type Stasher[T any] interface {
 	RetrieveOrEmpty(ctx context.Context) T
 }
 
-// NewStasher creates a stasher for the value type
-func NewStasher[T any](key StashKey) Stasher[T] {
+// New creates a stasher for the value type
+func New[T any](key Key) Stasher[T] {
 	return &stasher[T]{
 		key: key,
 	}
 }
 
 type stasher[T any] struct {
-	key StashKey
+	key Key
 }
 
-func (s *stasher[T]) Key() StashKey {
+func (s *stasher[T]) Key() Key {
 	return s.key
 }
 
 func (s *stasher[T]) Store(ctx context.Context, value T) {
-	StashValue(ctx, s.Key(), value)
+	StoreValue(ctx, s.Key(), value)
 }
 
 func (s *stasher[T]) Clear(ctx context.Context) T {
@@ -124,8 +124,8 @@ func (s *stasher[T]) RetrieveOrDie(ctx context.Context) T {
 	return value
 }
 
-var ErrStashValueNotFound = errors.New("value not found in stash")
-var ErrStashValueNotAssignable = errors.New("value found in stash is not of an assignable type")
+var ErrValueNotFound = errors.New("value not found in stash")
+var ErrValueNotAssignable = errors.New("value found in stash is not of an assignable type")
 
 func (s *stasher[T]) RetrieveOrError(ctx context.Context) (T, error) {
 	var emptyT T
@@ -133,13 +133,13 @@ func (s *stasher[T]) RetrieveOrError(ctx context.Context) (T, error) {
 	if value == nil {
 		// distinguish nil and missing values in stash
 		if !s.Has(ctx) {
-			return emptyT, ErrStashValueNotFound
+			return emptyT, ErrValueNotFound
 		}
 		return emptyT, nil
 	}
 	typedValue, ok := value.(T)
 	if !ok {
-		return emptyT, ErrStashValueNotAssignable
+		return emptyT, ErrValueNotAssignable
 	}
 	return typedValue, nil
 }

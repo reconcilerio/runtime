@@ -159,7 +159,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	}
 
 	ctx := context.Background()
-	if tc.Now == (time.Time{}) {
+	if tc.Now.IsZero() {
 		tc.Now = time.Now()
 	}
 	ctx = rtime.StashNow(ctx, tc.Now)

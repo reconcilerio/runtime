@@ -244,6 +244,9 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	}
 	c := expectConfig.Config()
 
+	ctx = reconcilers.StashConfig(ctx, c)
+	ctx = reconcilers.StashOriginalConfig(ctx, c)
+
 	r := factory(t, tc, c)
 	ctx = validation.WithRecursive(ctx)
 	if v, ok := r.(validation.Validator); ok {
@@ -258,9 +261,6 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		}
 		stash.StoreValue(ctx, k, v)
 	}
-
-	ctx = reconcilers.StashConfig(ctx, c)
-	ctx = reconcilers.StashOriginalConfig(ctx, c)
 
 	resource := tc.Resource.DeepCopyObject().(T)
 	if resource.GetResourceVersion() == "" {

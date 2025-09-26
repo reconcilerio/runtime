@@ -214,6 +214,10 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 		ExpectStatusPatches:     tc.ExpectStatusPatches,
 	}
 
+	c := expectConfig.Config()
+	ctx = reconcilers.StashConfig(ctx, c)
+	ctx = reconcilers.StashOriginalConfig(ctx, c)
+
 	configs := make(map[string]reconcilers.Config, len(tc.AdditionalConfigs))
 	for k, v := range tc.AdditionalConfigs {
 		v.Name = k
@@ -221,7 +225,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	}
 	ctx = reconcilers.StashAdditionalConfigs(ctx, configs)
 
-	r := factory(t, tc, expectConfig.Config())
+	r := factory(t, tc, c)
 	ctx = validation.WithRecursive(ctx)
 	if v, ok := r.(validation.Validator); ok {
 		if err := v.Validate(ctx); err != nil {

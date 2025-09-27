@@ -163,6 +163,15 @@ func (r *ResourceReconciler[T]) init() {
 	})
 }
 
+func (r *ResourceReconciler[T]) withContext(ctx context.Context) context.Context {
+	ctx = StashConfig(ctx, r.Config)
+	ctx = StashOriginalConfig(ctx, r.Config)
+	ctx = StashResourceType(ctx, r.Type)
+	ctx = StashOriginalResourceType(ctx, r.Type)
+
+	return ctx
+}
+
 func (r *ResourceReconciler[T]) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	_, err := r.SetupWithManagerYieldingController(ctx, mgr)
 	return err
@@ -175,11 +184,6 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 		WithName(r.Name).
 		WithValues("resourceType", gvk(r.Config, r.Type))
 	ctx = logr.NewContext(ctx, log)
-
-	ctx = StashConfig(ctx, r.Config)
-	ctx = StashOriginalConfig(ctx, r.Config)
-	ctx = StashResourceType(ctx, r.Type)
-	ctx = StashOriginalResourceType(ctx, r.Type)
 
 	if err := r.Validate(ctx); err != nil {
 		return nil, err
@@ -199,6 +203,9 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 		u.SetKind(kind)
 		bldr.For(u)
 	}
+
+	ctx = r.withContext(ctx)
+
 	if r.Setup != nil {
 		if err := r.Setup(ctx, mgr, bldr); err != nil {
 			return nil, err
@@ -212,6 +219,8 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 
 func (r *ResourceReconciler[T]) Validate(ctx context.Context) error {
 	r.init()
+
+	ctx = r.withContext(ctx)
 
 	// validate Reconciler value
 	if r.Reconciler == nil {
@@ -276,10 +285,7 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 
 	ctx = rtime.StashNow(ctx, time.Now())
 	ctx = StashRequest(ctx, req)
-	ctx = StashConfig(ctx, c)
-	ctx = StashOriginalConfig(ctx, c)
-	ctx = StashOriginalResourceType(ctx, r.Type)
-	ctx = StashResourceType(ctx, r.Type)
+	ctx = r.withContext(ctx)
 
 	if r.SkipRequest(ctx, req) {
 		return Result{}, nil

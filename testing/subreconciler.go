@@ -245,12 +245,6 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	c := expectConfig.Config()
 
 	r := factory(t, tc, c)
-	ctx = validation.WithRecursive(ctx)
-	if v, ok := r.(validation.Validator); ok {
-		if err := v.Validate(ctx); err != nil {
-			t.Fatalf("subreconciler validation failed: %s", err)
-		}
-	}
 
 	for k, v := range tc.GivenStashedValues {
 		if f, ok := v.(runtime.Object); ok {
@@ -279,6 +273,13 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 		configs[k] = v.Config()
 	}
 	ctx = reconcilers.StashAdditionalConfigs(ctx, configs)
+
+	ctx = validation.WithRecursive(ctx)
+	if v, ok := r.(validation.Validator); ok {
+		if err := v.Validate(ctx); err != nil {
+			t.Fatalf("subreconciler validation failed: %s", err)
+		}
+	}
 
 	// Run the Reconcile we're testing.
 	result, err := func(ctx context.Context, resource T) (reconcilers.Result, error) {

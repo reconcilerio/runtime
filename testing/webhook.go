@@ -119,7 +119,7 @@ type AdmissionWebhookTestCase struct {
 	// execution, or to make assertions for mocks.
 	CleanUp func(t *testing.T, ctx context.Context, tc *AdmissionWebhookTestCase) error
 	// Now is the time the test should run as, defaults to the current time. This value can be used
-	// by reconcilers via the reconcilers.RetireveNow(ctx) method.
+	// by reconcilers via the reconcilers.RetrieveNow(ctx) method.
 	Now time.Time
 	// Differ methods to use to compare expected and actual values. An empty string is returned for equivalent items.
 	Differ Differ

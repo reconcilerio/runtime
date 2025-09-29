@@ -131,7 +131,7 @@ type SubReconcilerTestCase[Type client.Object] struct {
 	// execution, or to make assertions for mocks.
 	CleanUp func(t *testing.T, ctx context.Context, tc *SubReconcilerTestCase[Type]) error
 	// Now is the time the test should run as, defaults to the current time. This value can be used
-	// by reconcilers via the reconcilers.RetireveNow(ctx) method.
+	// by reconcilers via the reconcilers.RetrieveNow(ctx) method.
 	Now time.Time
 	// Differ methods to use to compare expected and actual values. An empty string is returned for equivalent items.
 	Differ Differ
@@ -168,7 +168,7 @@ func (tc *SubReconcilerTestCase[T]) Run(t *testing.T, scheme *runtime.Scheme, fa
 	}
 
 	ctx := stash.WithContext(context.Background())
-	if tc.Now == (time.Time{}) {
+	if tc.Now.IsZero() {
 		tc.Now = time.Now()
 	}
 	ctx = rtime.StashNow(ctx, tc.Now)

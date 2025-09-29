@@ -121,7 +121,7 @@ type ReconcilerTestCase struct {
 	// execution, or to make assertions for mocks.
 	CleanUp func(t *testing.T, ctx context.Context, tc *ReconcilerTestCase) error
 	// Now is the time the test should run as, defaults to the current time. This value can be used
-	// by reconcilers via the reconcilers.RetireveNow(ctx) method.
+	// by reconcilers via the reconcilers.RetrieveNow(ctx) method.
 	Now time.Time
 	// Differ methods to use to compare expected and actual values. An empty string is returned for equivalent items.
 	Differ Differ
@@ -159,7 +159,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 	}
 
 	ctx := context.Background()
-	if tc.Now == (time.Time{}) {
+	if tc.Now.IsZero() {
 		tc.Now = time.Now()
 	}
 	ctx = rtime.StashNow(ctx, tc.Now)

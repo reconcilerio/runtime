@@ -117,7 +117,7 @@ type ResourceReconciler[Type client.Object] struct {
 	AfterReconcile func(ctx context.Context, req Request, res Result, err error) (Result, error)
 
 	// SkipResource shortcuts the reconciler for the specific request. While the context and logger
-	// are initialized, no work is preformed. The request is removed from the workqueue.
+	// are initialized, no work is performed. The request is removed from the workqueue.
 	//
 	// +optional
 	SkipRequest func(ctx context.Context, req Request) bool

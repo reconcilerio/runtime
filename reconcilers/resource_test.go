@@ -964,7 +964,7 @@ func TestResourceReconciler(t *testing.T) {
 								resource.Status.Fields = map[string]string{}
 							}
 							resource.Status.Fields["Reconciler"] = "ran"
-							// the result is ignored because the status is updated
+							// the result is honored
 							return reconcilers.Result{RequeueAfter: 10}, nil
 						},
 					}
@@ -973,6 +973,9 @@ func TestResourceReconciler(t *testing.T) {
 			ExpectEvents: []rtesting.Event{
 				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
 					`Updated status`),
+			},
+			ExpectedResult: reconcile.Result{
+				RequeueAfter: 10,
 			},
 			ExpectStatusUpdates: []client.Object{
 				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {

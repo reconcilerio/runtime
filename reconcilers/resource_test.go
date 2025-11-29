@@ -26,9 +26,11 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	diemetav1 "reconciler.io/dies/apis/meta/v1"
 	"reconciler.io/runtime/apis"
@@ -1194,6 +1196,42 @@ func TestResourceReconciler(t *testing.T) {
 				}),
 			},
 			ShouldErr: true,
+		},
+		"status update conflicts are silenced": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResource{},
+			},
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			WithReactors: []rtesting.ReactionFunc{
+				rtesting.InduceFailure("update", "TestResource", rtesting.InduceFailureOpts{
+					SubResource: "status",
+					Error: apierrs.NewConflict(schema.GroupResource{
+						Group:    resources.GroupVersion.Group,
+						Resource: "TestResource",
+					}, testRequest.Name, fmt.Errorf("induced failure")),
+				}),
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResource] {
+					return &reconcilers.SyncReconciler[*resources.TestResource]{
+						Sync: func(ctx context.Context, resource *resources.TestResource) error {
+							if resource.Status.Fields == nil {
+								resource.Status.Fields = map[string]string{}
+							}
+							resource.Status.Fields["Reconciler"] = "ran"
+							return nil
+						},
+					}
+				},
+			},
+			ExpectStatusUpdates: []client.Object{
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.AddField("Reconciler", "ran")
+				}),
+			},
 		},
 		"context is stashable": {
 			Request: testRequest,

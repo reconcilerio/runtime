@@ -376,7 +376,7 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 			log.Info("updating status", "diff", cmp.Diff(originalResourceStatus, resourceStatus, IgnoreAllUnexported))
 			if updateErr := c.Status().Update(ctx, resource); updateErr != nil {
 				if apierrs.IsConflict(updateErr) {
-					log.Info("unable to update status: %s", updateErr)
+					log.Info("unable to update status", "error", updateErr.Error())
 					// we want the request to retry, since the conflicting resource is watched, the
 					// updated request is either already in the workqueue, or will be added by the
 					// informer shortly.

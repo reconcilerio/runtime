@@ -126,6 +126,11 @@ type ResourceReconciler[Type client.Object] struct {
 	// +optional
 	SkipResource func(ctx context.Context, resource Type) bool
 
+	// ForOptions is called to build predicates/options passed to the builder's For method.
+	//
+	// +optional
+	ForOptions func() ([]builder.ForOption, error)
+
 	Config Config
 
 	lazyInit sync.Once
@@ -136,6 +141,11 @@ func (r *ResourceReconciler[T]) init() {
 		if internal.IsNil(r.Type) {
 			var nilT T
 			r.Type = newEmpty(nilT).(T)
+		}
+		if r.ForOptions == nil {
+			r.ForOptions = func() ([]builder.ForOption, error) {
+				return nil, nil
+			}
 		}
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sResourceReconciler", typeName(r.Type))
@@ -189,9 +199,14 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 		return nil, err
 	}
 
+	forOptions, err := r.ForOptions()
+	if err != nil {
+		return nil, err
+	}
+
 	bldr := ctrl.NewControllerManagedBy(mgr)
 	if !duck.IsDuck(r.Type, r.Config.Scheme()) {
-		bldr.For(r.Type)
+		bldr.For(r.Type, forOptions...)
 	} else {
 		gvk, err := r.Config.GroupVersionKindFor(r.Type)
 		if err != nil {
@@ -201,7 +216,7 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 		u := &unstructured.Unstructured{}
 		u.SetAPIVersion(apiVersion)
 		u.SetKind(kind)
-		bldr.For(u)
+		bldr.For(u, forOptions...)
 	}
 
 	ctx = r.withContext(ctx)

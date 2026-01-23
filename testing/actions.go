@@ -79,3 +79,11 @@ func NewApplyAction(ac runtime.ApplyConfiguration) ApplyAction {
 
 	return action
 }
+
+func NewApplySubresourceAction(ac runtime.ApplyConfiguration, subresource string) ApplyAction {
+	action := NewApplyAction(ac).(ApplyActionImpl)
+
+	action.Subresource = subresource
+
+	return action
+}

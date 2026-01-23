@@ -312,6 +312,10 @@ func (w *duckAwareSubResourceWriterWrapper) Patch(ctx context.Context, obj clien
 	return Convert(u, obj)
 }
 
+func (w *duckAwareSubResourceWriterWrapper) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error {
+	return w.subResourceWriter.Apply(ctx, obj, opts...)
+}
+
 type duckAwareSubResourceClientWrapper struct {
 	subResourceClient client.SubResourceClient
 	scheme            SchemeAccessor
@@ -361,4 +365,8 @@ func (c *duckAwareSubResourceClientWrapper) Patch(ctx context.Context, obj clien
 		return err
 	}
 	return Convert(u, obj)
+}
+
+func (w *duckAwareSubResourceClientWrapper) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error {
+	return w.subResourceClient.Apply(ctx, obj, opts...)
 }

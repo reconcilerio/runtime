@@ -95,6 +95,8 @@ type ReconcilerTestCase struct {
 	ExpectStatusUpdates []client.Object
 	// ExpectStatusPatches builds the ordered list of objects whose status is patched during reconciliation
 	ExpectStatusPatches []PatchRef
+	// ExpectStatusApplies builds the ordered list of objects whose status is applied during reconciliation
+	ExpectStatusApplies []ApplyRef
 
 	// AdditionalConfigs holds ExceptConfigs that are available to the test case and will have
 	// their expectations checked again the observed config interactions. The key in this map is
@@ -212,6 +214,7 @@ func (tc *ReconcilerTestCase) Run(t *testing.T, scheme *runtime.Scheme, factory 
 		ExpectDeleteCollections: tc.ExpectDeleteCollections,
 		ExpectStatusUpdates:     tc.ExpectStatusUpdates,
 		ExpectStatusPatches:     tc.ExpectStatusPatches,
+		ExpectStatusApplies:     tc.ExpectStatusApplies,
 	}
 
 	configs := make(map[string]reconcilers.Config, len(tc.AdditionalConfigs))

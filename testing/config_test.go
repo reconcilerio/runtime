@@ -70,6 +70,12 @@ func TestExpectConfig(t *testing.T) {
 		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(1))
 	ac2 := applyconfigurationsappsv1.Deployment("resource", ns).
 		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(2))
+	acs1 := applyconfigurationsappsv1.Deployment("resource", ns).
+		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(1)).
+		WithStatus(applyconfigurationsappsv1.DeploymentStatus().WithReplicas(1))
+	acs2 := applyconfigurationsappsv1.Deployment("resource", ns).
+		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(2)).
+		WithStatus(applyconfigurationsappsv1.DeploymentStatus().WithReplicas(2))
 
 	scheme := runtime.NewScheme()
 	_ = resources.AddToScheme(scheme)
@@ -798,6 +804,71 @@ func TestExpectConfig(t *testing.T) {
 			},
 		},
 
+		"expected status apply": {
+			config: ExpectConfig{
+				ExpectStatusApplies: []ApplyRef{
+					{
+						Group:              "apps",
+						Kind:               "Deployment",
+						Namespace:          ns,
+						Name:               "resource",
+						ApplyConfiguration: acs1,
+					},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Status().Apply(ctx, acs1)
+			},
+			failedAssertions: []string{},
+		},
+		"unexpected status apply": {
+			config: ExpectConfig{
+				ExpectStatusApplies: []ApplyRef{
+					{
+						Group:              "apps",
+						Kind:               "Deployment",
+						Namespace:          ns,
+						Name:               "resource",
+						ApplyConfiguration: acs2,
+					},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Status().Apply(ctx, acs1)
+			},
+			failedAssertions: []string{
+				`ExpectStatusApplies[0] differs for config "test" (-expected, +actual):`,
+			},
+		},
+		"extra status apply": {
+			config: ExpectConfig{
+				ExpectStatusApplies: []ApplyRef{},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Status().Apply(ctx, acs1)
+			},
+			failedAssertions: []string{
+				`Unexpected StatusApply observed for config "test": `,
+			},
+		},
+		"missing status apply": {
+			config: ExpectConfig{
+				ExpectStatusApplies: []ApplyRef{
+					{
+						Group:              "apps",
+						Kind:               "Deployment",
+						Namespace:          ns,
+						Name:               "resource",
+						ApplyConfiguration: acs1,
+					},
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {},
+			failedAssertions: []string{
+				`ExpectStatusApplies[0] not observed for config "test": `,
+			},
+		},
+
 		"custom diff - always different": {
 			config: ExpectConfig{
 				Differ: &staticDiffer{
@@ -830,6 +901,9 @@ func TestExpectConfig(t *testing.T) {
 				ExpectStatusPatches: []PatchRef{
 					{Group: "testing.reconciler.runtime", Kind: "TestResource", Namespace: ns, Name: "resource-1", SubResource: "status", PatchType: types.MergePatchType, Patch: []byte(`{"status":{"fields":{"foo":"bar"}}}`)},
 				},
+				ExpectStatusApplies: []ApplyRef{
+					{Group: "apps", Kind: "Deployment", Namespace: ns, Name: "resource", ApplyConfiguration: acs1},
+				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
 				c.Tracker.TrackObject(r2, r1)
@@ -841,6 +915,7 @@ func TestExpectConfig(t *testing.T) {
 				c.DeleteAllOf(ctx, &resources.TestResourceNoStatus{})
 				c.Status().Update(ctx, r1.DeepCopy())
 				c.Status().Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))
+				c.Status().Apply(ctx, acs1)
 			},
 			failedAssertions: []string{
 				"ExpectCreates[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
@@ -850,6 +925,7 @@ func TestExpectConfig(t *testing.T) {
 				"ExpectDeleteCollections[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
 				"ExpectStatusUpdates[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
 				"ExpectStatusPatches[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
+				"ExpectStatusApplies[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
 				"ExpectEvents[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
 				"ExpectTracks[0] differs for config \"test\" (-expected, +actual):\nalways different\n",
 			},
@@ -886,6 +962,9 @@ func TestExpectConfig(t *testing.T) {
 				ExpectStatusPatches: []PatchRef{
 					{Group: "testing.reconciler.runtime", Kind: "TestResource", Namespace: ns, Name: "resource-1", SubResource: "status", PatchType: types.MergePatchType, Patch: []byte(`{"status":{"fields":{"foo":"bar"}}}`)},
 				},
+				ExpectStatusApplies: []ApplyRef{
+					{Group: "apps", Kind: "Deployment", Namespace: ns, Name: "resource", ApplyConfiguration: acs1},
+				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
 				c.Tracker.TrackObject(r2, r1)
@@ -897,6 +976,7 @@ func TestExpectConfig(t *testing.T) {
 				c.DeleteAllOf(ctx, &resources.TestResourceNoStatus{})
 				c.Status().Update(ctx, r1.DeepCopy())
 				c.Status().Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))
+				c.Status().Apply(ctx, acs1)
 			},
 			failedAssertions: []string{},
 		},

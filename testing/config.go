@@ -105,6 +105,8 @@ type ExpectConfig struct {
 	ExpectStatusUpdates []client.Object
 	// ExpectStatusPatches builds the ordered list of objects whose status is patched during reconciliation
 	ExpectStatusPatches []PatchRef
+	// ExpectStatusApplies builds the ordered list of objects whose status is applied during reconciliation
+	ExpectStatusApplies []ApplyRef
 
 	once           sync.Once
 	client         *clientWrapper
@@ -254,6 +256,7 @@ func (c *ExpectConfig) AssertClientExpectations(t *testing.T) {
 	c.AssertClientDeleteCollectionExpectations(t)
 	c.AssertClientStatusUpdateExpectations(t)
 	c.AssertClientStatusPatchExpectations(t)
+	c.AssertClientStatusApplyExpectations(t)
 }
 
 // AssertClientApplyExpectations asserts observed reconciler client create behavior matches the expected client create behavior
@@ -407,6 +410,31 @@ func (c *ExpectConfig) AssertClientStatusPatchExpectations(t *testing.T) {
 	if actual, expected := len(c.client.StatusPatchActions), len(c.ExpectStatusPatches); actual > expected {
 		for _, extra := range c.client.StatusPatchActions[expected:] {
 			c.errorf(t, "Unexpected StatusPatch observed%s: %#v", c.configNameMsg(), extra)
+		}
+	}
+}
+
+// AssertClientStatusApplyExpectations asserts observed reconciler client status apply behavior matches the expected client status apply behavior
+func (c *ExpectConfig) AssertClientStatusApplyExpectations(t *testing.T) {
+	if t != nil {
+		t.Helper()
+	}
+	c.init()
+
+	for i, exp := range c.ExpectStatusApplies {
+		if i >= len(c.client.StatusApplyActions) {
+			c.errorf(t, "ExpectStatusApplies[%d] not observed%s: %#v", i, c.configNameMsg(), exp)
+			continue
+		}
+		actual := NewApplyRef(c.client.StatusApplyActions[i])
+
+		if diff := c.Differ.ApplyRef(exp, actual); diff != "" {
+			c.errorf(t, "ExpectStatusApplies[%d] differs%s (%s, %s):\n%s", i, c.configNameMsg(), DiffRemovedColor.Sprint("-expected"), DiffAddedColor.Sprint("+actual"), ColorizeDiff(diff))
+		}
+	}
+	if actual, expected := len(c.client.StatusApplyActions), len(c.ExpectStatusApplies); actual > expected {
+		for _, extra := range c.client.StatusApplyActions[expected:] {
+			c.errorf(t, "Unexpected StatusApply observed%s: %#v", c.configNameMsg(), extra)
 		}
 	}
 }

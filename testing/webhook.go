@@ -99,6 +99,8 @@ type AdmissionWebhookTestCase struct {
 	ExpectStatusUpdates []client.Object
 	// ExpectStatusPatches builds the ordered list of objects whose status is patched during reconciliation
 	ExpectStatusPatches []PatchRef
+	// ExpectStatusApplies builds the ordered list of objects whose status is applied during reconciliation
+	ExpectStatusApplies []ApplyRef
 
 	// outputs
 
@@ -225,6 +227,7 @@ func (tc *AdmissionWebhookTestCase) RunWithContext(t *testing.T, scheme *runtime
 		ExpectDeleteCollections: tc.ExpectDeleteCollections,
 		ExpectStatusUpdates:     tc.ExpectStatusUpdates,
 		ExpectStatusPatches:     tc.ExpectStatusPatches,
+		ExpectStatusApplies:     tc.ExpectStatusApplies,
 	}
 
 	c := expectConfig.Config()

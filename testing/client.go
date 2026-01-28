@@ -51,6 +51,7 @@ type clientWrapper struct {
 	DeleteCollectionActions []DeleteCollectionAction
 	StatusUpdateActions     []objectAction
 	StatusPatchActions      []PatchAction
+	StatusApplyActions      []ApplyAction
 	genCount                int
 	reactionChain           []Reactor
 }
@@ -69,6 +70,7 @@ func NewFakeClientWrapper(client client.Client, tracker clientgotesting.ObjectTr
 		DeleteCollectionActions: []DeleteCollectionAction{},
 		StatusUpdateActions:     []objectAction{},
 		StatusPatchActions:      []PatchAction{},
+		StatusApplyActions:      []ApplyAction{},
 		genCount:                0,
 		reactionChain:           []Reactor{},
 	}
@@ -401,6 +403,18 @@ func (w *statusWriterWrapper) Patch(ctx context.Context, obj client.Object, patc
 	return w.statusWriter.Patch(ctx, obj, patch, opts...)
 }
 
+func (w *statusWriterWrapper) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error {
+	// capture action
+	w.clientWrapper.StatusApplyActions = append(w.clientWrapper.StatusApplyActions, NewApplySubresourceAction(obj, "status"))
+
+	// call reactor chain
+	if err := w.clientWrapper.react(NewApplySubresourceAction(obj, "status")); err != nil {
+		return err
+	}
+
+	return w.statusWriter.Apply(ctx, obj, opts...)
+}
+
 type subResourceClientWrapper struct {
 	subResource   string
 	clientWrapper *clientWrapper
@@ -462,6 +476,15 @@ func (w *subResourceClientWrapper) Patch(ctx context.Context, obj client.Object,
 
 	// call reactor chain
 	return w.clientWrapper.react(clientgotesting.NewPatchSubresourceAction(gvr, obj.GetNamespace(), obj.GetName(), patch.Type(), b, w.subResource))
+}
+
+func (w *subResourceClientWrapper) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error {
+	if w.subResource == "status" {
+		return w.clientWrapper.Status().Apply(ctx, obj, opts...)
+	}
+
+	// call reactor chain
+	return w.clientWrapper.react(NewApplySubresourceAction(obj, w.subResource))
 }
 
 // InduceFailure is used in conjunction with reconciler test's WithReactors field.

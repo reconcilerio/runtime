@@ -217,8 +217,11 @@ func (c *ExpectConfig) Config() reconcilers.Config {
 		Client:    c.client,
 		APIReader: c.apiReader,
 		Discovery: c.discovery,
-		Recorder:  c.recorder,
-		Tracker:   c.tracker,
+		Recorder: &deprecatedEventRecorder{
+			recorder: c.recorder,
+		},
+		EventRecorder: c.recorder,
+		Tracker:       c.tracker,
 	}
 }
 

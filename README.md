@@ -116,7 +116,7 @@ Replace `<group>` and `<resource>` with values for the reconciled resource type.
 ```go
 // +kubebuilder:rbac:groups=<group>,resources=<resource>,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=<group>,resources=<resource>/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core;events.k8s.io,resources=events,verbs=get;list;watch;create;update;patch;delete
 ```
 
 or
@@ -133,7 +133,7 @@ rules:
 - apiGroups: ["<group>"]
   resources: ["<resource>/status"]
   verbs: ["get", "update", "patch"]
-- apiGroups: ["core"]
+- apiGroups: ["core", "events.k8s.io"]
   resources: ["events"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ```
@@ -206,7 +206,7 @@ Replace `<group>` and `<resource>` with values for the reconciled resource type.
 
 ```go
 // +kubebuilder:rbac:groups=<group>,resources=<resource>,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core;events.k8s.io,resources=events,verbs=get;list;watch;create;update;patch;delete
 ```
 
 or
@@ -220,7 +220,7 @@ rules:
 - apiGroups: ["<group>"]
   resources: ["<resource>"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["core"]
+- apiGroups: ["core", "events.k8s.io"]
   resources: ["events"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ```
@@ -983,7 +983,7 @@ The [`ExpectConfig`](https://pkg.go.dev/reconciler.io/runtime/testing#ExpectConf
 The [`Config`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config) is a single object that contains the common remote APIs needed by a reconciler. The config object includes:
 - [`Client`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.Client) as the primary interaction with the Kubernetes API Server. Gets and Lists are read from informers when available.
 - [`APIReader`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.APIReader) read-only Kubernetes API Server client that bypasses informers.
-- [`Recorder`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.Recorder) record Kubernetes events for a resource.
+- [`EventRecorder`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.Recorder) record Kubernetes events for a resource.
 - [`Tracker`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#Config.Tracker) track relationships between resource, and later lookup resources tracking a specific resource.
 
 Root reconcilers like [ResourceReconciler](#resourcereconciler) and [AdmissionWebhookAdapter](#admissionwebhookadapter) accept a Config to use that is then passed to [SubReconciler](#subreconciler) via the context, and retrieved using [`RetrieveConfigOrDie`](https://pkg.go.dev/reconciler.io/runtime/reconcilers#RetrieveConfigOrDie). The active config may be modified at runtime using [WithConfig](#withconfig).
@@ -1137,8 +1137,9 @@ A minimal test case for a sub reconciler that adds a finalizer may look like:
 		Name: "add 'test.finalizer' finalizer",
 		Resource: resourceDie.DieReleasePtr(),
 		ExpectEvents: []rtesting.Event{
-			rtesting.NewEvent(resourceDie, scheme, corev1.EventTypeNormal, "FinalizerPatched",
-				`Patched finalizer %q`, "test.finalizer"),
+			rtesting.NewRecordedEvent(resourceDie, nil, scheme, corev1.EventTypeNormal, "FinalizerPatched",
+				fmt.Sprintf(`Patched finalizer %q`, "test.finalizer"),
+				""),
 		},
 		ExpectResource: resourceDie.
 			MetadataDie(func(d *diemetav1.ObjectMetaDie) {

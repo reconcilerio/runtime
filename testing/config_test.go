@@ -77,6 +77,16 @@ func TestExpectConfig(t *testing.T) {
 		WithSpec(applyconfigurationsappsv1.DeploymentSpec().WithReplicas(2)).
 		WithStatus(applyconfigurationsappsv1.DeploymentStatus().WithReplicas(2))
 
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       ns,
+			Name:            "config",
+			UID:             types.UID("12932f66-1f67-40c3-a8a8-6c1d0b691fa0"),
+			ResourceVersion: "42",
+			Generation:      3,
+		},
+	}
+
 	scheme := runtime.NewScheme()
 	_ = resources.AddToScheme(scheme)
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -297,22 +307,22 @@ func TestExpectConfig(t *testing.T) {
 		"expected event": {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
-					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
-				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Eventf(r1, nil, corev1.EventTypeNormal, "TheReason", "the action", "the note")
 			},
 			failedAssertions: []string{},
 		},
 		"unexpected event": {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
-					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
-				c.Recorder.Eventf(r2, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Eventf(r2, nil, corev1.EventTypeNormal, "TheReason", "the action", "the note")
 			},
 			failedAssertions: []string{
 				`ExpectEvents[0] differs for config "test" (-expected, +actual):`,
@@ -323,7 +333,7 @@ func TestExpectConfig(t *testing.T) {
 				ExpectEvents: []Event{},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
-				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Eventf(r1, nil, corev1.EventTypeNormal, "TheReason", "the action", "the note")
 			},
 			failedAssertions: []string{
 				`Unexpected Event observed for config "test": `,
@@ -332,13 +342,41 @@ func TestExpectConfig(t *testing.T) {
 		"missing event": {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
-					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {},
 			failedAssertions: []string{
 				`ExpectEvents[0] not observed for config "test": `,
 			},
+		},
+		"legacy event intermixing": {
+			config: ExpectConfig{
+				ExpectEvents: []Event{
+					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message 2"),
+					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note 2"),
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Eventf(r1, nil, corev1.EventTypeNormal, "TheReason", "the action", "the note")
+				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message 2")
+				c.Eventf(r1, nil, corev1.EventTypeNormal, "TheReason", "the action", "the note 2")
+			},
+			failedAssertions: []string{},
+		},
+		"event related objects": {
+			config: ExpectConfig{
+				ExpectEvents: []Event{
+					NewRecordedEvent(r1, cm, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+				},
+			},
+			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
+				c.Eventf(r1, cm, corev1.EventTypeNormal, "TheReason", "the action", "the note")
+			},
+			failedAssertions: []string{},
 		},
 
 		"expected create": {
@@ -878,7 +916,7 @@ func TestExpectConfig(t *testing.T) {
 					NewTrackRequest(r2, r1, scheme),
 				},
 				ExpectEvents: []Event{
-					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 				ExpectCreates: []client.Object{
 					r1,
@@ -907,7 +945,7 @@ func TestExpectConfig(t *testing.T) {
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
 				c.Tracker.TrackObject(r2, r1)
-				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Eventf(r1, nil, corev1.EventTypeNormal, "TheReason", "the action", "the note")
 				c.Create(ctx, r1.DeepCopy())
 				c.Update(ctx, r1.DeepCopy())
 				c.Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))
@@ -939,7 +977,7 @@ func TestExpectConfig(t *testing.T) {
 					NewTrackRequest(r2, r1, scheme),
 				},
 				ExpectEvents: []Event{
-					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
+					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 				ExpectCreates: []client.Object{
 					r1,
@@ -968,7 +1006,7 @@ func TestExpectConfig(t *testing.T) {
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
 				c.Tracker.TrackObject(r2, r1)
-				c.Recorder.Eventf(r1, corev1.EventTypeNormal, "TheReason", "the message")
+				c.Eventf(r1, nil, corev1.EventTypeNormal, "TheReason", "the action", "the note")
 				c.Create(ctx, r1.DeepCopy())
 				c.Update(ctx, r1.DeepCopy())
 				c.Patch(ctx, r1patch.DeepCopy(), client.MergeFrom(r1))

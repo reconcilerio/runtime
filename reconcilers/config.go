@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,8 +47,10 @@ type Config struct {
 	client.Client
 	APIReader client.Reader
 	Discovery discovery.DiscoveryInterface
-	Recorder  record.EventRecorder
-	Tracker   tracker.Tracker
+	// Deprecated upstream, use EventRecorder instead. Will be removed when support is dropped within controller-runtime
+	Recorder record.EventRecorder
+	events.EventRecorder
+	Tracker tracker.Tracker
 
 	syncPeriod time.Duration
 }
@@ -59,11 +62,12 @@ func (c Config) IsEmpty() bool {
 // WithCluster extends the config to access a new cluster.
 func (c Config) WithCluster(cluster cluster.Cluster) Config {
 	return Config{
-		Client:    duck.NewDuckAwareClientWrapper(cluster.GetClient()),
-		APIReader: duck.NewDuckAwareAPIReaderWrapper(cluster.GetAPIReader(), cluster.GetClient()),
-		Discovery: discovery.NewDiscoveryClientForConfigOrDie(cluster.GetConfig()),
-		Recorder:  cluster.GetEventRecorderFor("controller"),
-		Tracker:   c.Tracker,
+		Client:        duck.NewDuckAwareClientWrapper(cluster.GetClient()),
+		APIReader:     duck.NewDuckAwareAPIReaderWrapper(cluster.GetAPIReader(), cluster.GetClient()),
+		Discovery:     discovery.NewDiscoveryClientForConfigOrDie(cluster.GetConfig()),
+		Recorder:      cluster.GetEventRecorderFor("controller"),
+		EventRecorder: cluster.GetEventRecorder("controller"),
+		Tracker:       c.Tracker,
 
 		syncPeriod: c.syncPeriod,
 	}
@@ -72,11 +76,12 @@ func (c Config) WithCluster(cluster cluster.Cluster) Config {
 // WithTracker extends the config with a new tracker.
 func (c Config) WithTracker() Config {
 	return Config{
-		Client:    c.Client,
-		APIReader: c.APIReader,
-		Discovery: c.Discovery,
-		Recorder:  c.Recorder,
-		Tracker:   tracker.New(c.Scheme(), 2*c.syncPeriod),
+		Client:        c.Client,
+		APIReader:     c.APIReader,
+		Discovery:     c.Discovery,
+		Recorder:      c.Recorder,
+		EventRecorder: c.EventRecorder,
+		Tracker:       tracker.New(c.Scheme(), 2*c.syncPeriod),
 
 		syncPeriod: c.syncPeriod,
 	}

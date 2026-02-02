@@ -307,7 +307,7 @@ func TestExpectConfig(t *testing.T) {
 		"expected event": {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
-					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEventf(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
@@ -318,7 +318,7 @@ func TestExpectConfig(t *testing.T) {
 		"unexpected event": {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
-					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEventf(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
@@ -342,7 +342,7 @@ func TestExpectConfig(t *testing.T) {
 		"missing event": {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
-					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEventf(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {},
@@ -354,9 +354,9 @@ func TestExpectConfig(t *testing.T) {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
 					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message"),
-					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEventf(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 					NewEvent(r1, scheme, corev1.EventTypeNormal, "TheReason", "the message 2"),
-					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note 2"),
+					NewEventf(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note 2"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
@@ -370,7 +370,7 @@ func TestExpectConfig(t *testing.T) {
 		"event related objects": {
 			config: ExpectConfig{
 				ExpectEvents: []Event{
-					NewRecordedEvent(r1, cm, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEventf(r1, cm, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 			},
 			operation: func(t *testing.T, ctx context.Context, c reconcilers.Config) {
@@ -916,7 +916,7 @@ func TestExpectConfig(t *testing.T) {
 					NewTrackRequest(r2, r1, scheme),
 				},
 				ExpectEvents: []Event{
-					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEventf(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 				ExpectCreates: []client.Object{
 					r1,
@@ -977,7 +977,7 @@ func TestExpectConfig(t *testing.T) {
 					NewTrackRequest(r2, r1, scheme),
 				},
 				ExpectEvents: []Event{
-					NewRecordedEvent(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
+					NewEventf(r1, nil, scheme, corev1.EventTypeNormal, "TheReason", "the action", "the note"),
 				},
 				ExpectCreates: []client.Object{
 					r1,

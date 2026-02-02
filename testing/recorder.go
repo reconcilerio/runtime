@@ -41,7 +41,7 @@ type Event struct {
 	Note    string
 }
 
-// Deprecated, prefer NewRecordedEvent
+// Deprecated, prefer NewEventf
 func NewEvent(factory client.Object, scheme *runtime.Scheme, eventtype, reason, messageFormat string, a ...interface{}) Event {
 	obj := factory.DeepCopyObject()
 	objref, err := ref.GetReference(scheme, obj)
@@ -64,7 +64,7 @@ func NewEvent(factory client.Object, scheme *runtime.Scheme, eventtype, reason, 
 	}
 }
 
-func NewRecordedEvent(regarding, related client.Object, scheme *runtime.Scheme, eventtype, reason, action, note string, a ...interface{}) Event {
+func NewEventf(regarding, related client.Object, scheme *runtime.Scheme, eventtype, reason, action, note string, a ...interface{}) Event {
 	regardingref, err := ref.GetReference(scheme, regarding.DeepCopyObject())
 	if err != nil {
 		panic(fmt.Sprintf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v' '%v'", regarding, err, eventtype, reason, action, fmt.Sprintf(note, a...)))
@@ -131,5 +131,5 @@ func (r *eventRecorder) Eventf(regarding runtime.Object, related runtime.Object,
 		relatedObj = related.(client.Object)
 	}
 
-	r.events = append(r.events, NewRecordedEvent(regardingObj, relatedObj, r.scheme, eventtype, reason, action, note, args...))
+	r.events = append(r.events, NewEventf(regardingObj, relatedObj, r.scheme, eventtype, reason, action, note, args...))
 }

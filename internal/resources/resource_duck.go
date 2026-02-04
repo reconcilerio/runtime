@@ -18,7 +18,6 @@ package resources
 
 import (
 	"context"
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -42,15 +41,11 @@ type TestDuck struct {
 	Status TestResourceStatus `json:"status"`
 }
 
-func (*TestDuck) Default(ctx context.Context, obj runtime.Object) error {
-	r, ok := obj.(*TestDuck)
-	if !ok {
-		return fmt.Errorf("expected obj to be TestDuck")
+func (*TestDuck) Default(ctx context.Context, obj *TestDuck) error {
+	if obj.Spec.Fields == nil {
+		obj.Spec.Fields = map[string]string{}
 	}
-	if r.Spec.Fields == nil {
-		r.Spec.Fields = map[string]string{}
-	}
-	r.Spec.Fields["Defaulter"] = "ran"
+	obj.Spec.Fields["Defaulter"] = "ran"
 	return nil
 }
 

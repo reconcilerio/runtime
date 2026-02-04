@@ -18,14 +18,12 @@ package resources
 
 import (
 	"context"
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-var _ webhook.CustomDefaulter = &TestResourceEmptyStatus{}
+var _ admission.Defaulter[*TestResourceEmptyStatus] = &TestResourceEmptyStatus{}
 
 // +kubebuilder:object:root=true
 // +genclient
@@ -38,16 +36,11 @@ type TestResourceEmptyStatus struct {
 	Status TestResourceEmptyStatusStatus `json:"status"`
 }
 
-func (*TestResourceEmptyStatus) Default(ctx context.Context, obj runtime.Object) error {
-	r, ok := obj.(*TestResourceEmptyStatus)
-	if !ok {
-		return fmt.Errorf("expected obj to be TestResourceEmptyStatus")
+func (*TestResourceEmptyStatus) Default(ctx context.Context, obj *TestResourceEmptyStatus) error {
+	if obj.Spec.Fields == nil {
+		obj.Spec.Fields = map[string]string{}
 	}
-
-	if r.Spec.Fields == nil {
-		r.Spec.Fields = map[string]string{}
-	}
-	r.Spec.Fields["Defaulter"] = "ran"
+	obj.Spec.Fields["Defaulter"] = "ran"
 
 	return nil
 }

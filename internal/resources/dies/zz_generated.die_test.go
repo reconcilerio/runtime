@@ -142,3 +142,12 @@ func TestTestResourceWithLegacyDefaultDie_MissingMethods(t *testingx.T) {
 		t.Errorf("found missing fields for TestResourceWithLegacyDefaultDie: %s", diff.List())
 	}
 }
+
+func TestTestResourceWithObjectDefaultDie_MissingMethods(t *testingx.T) {
+	die := TestResourceWithObjectDefaultBlank
+	ignore := []string{"TypeMeta", "ObjectMeta"}
+	diff := testing.DieFieldDiff(die).Delete(ignore...)
+	if diff.Len() != 0 {
+		t.Errorf("found missing fields for TestResourceWithObjectDefaultDie: %s", diff.List())
+	}
+}

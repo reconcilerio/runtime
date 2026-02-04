@@ -23,20 +23,18 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reconciler.io/runtime/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 var (
-	_ webhook.CustomDefaulter = &TestResource{}
-	_ webhook.CustomValidator = &TestResource{}
-	_ client.Object           = &TestResource{}
+	_ admission.Defaulter[*TestResource] = &TestResource{}
+	_ admission.Validator[*TestResource] = &TestResource{}
+	_ client.Object                      = &TestResource{}
 )
 
 // +kubebuilder:object:root=true
@@ -50,48 +48,24 @@ type TestResource struct {
 	Status TestResourceStatus `json:"status"`
 }
 
-func (*TestResource) Default(ctx context.Context, obj runtime.Object) error {
-	r, ok := obj.(*TestResource)
-	if !ok {
-		return fmt.Errorf("expected object to be TestResource")
+func (*TestResource) Default(ctx context.Context, obj *TestResource) error {
+	if obj.Spec.Fields == nil {
+		obj.Spec.Fields = map[string]string{}
 	}
-
-	if r.Spec.Fields == nil {
-		r.Spec.Fields = map[string]string{}
-	}
-	r.Spec.Fields["Defaulter"] = "ran"
+	obj.Spec.Fields["Defaulter"] = "ran"
 
 	return nil
 }
 
-func (*TestResource) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	r, ok := obj.(*TestResource)
-	if !ok {
-		return nil, fmt.Errorf("expected obj to be TestResource")
-	}
-
-	return nil, r.validate(ctx).ToAggregate()
+func (*TestResource) ValidateCreate(ctx context.Context, obj *TestResource) (admission.Warnings, error) {
+	return nil, obj.validate(ctx).ToAggregate()
 }
 
-func (*TestResource) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	_, ok := oldObj.(*TestResource)
-	if !ok {
-		return nil, fmt.Errorf("expected oldObj to be TestResource")
-	}
-	r, ok := newObj.(*TestResource)
-	if !ok {
-		return nil, fmt.Errorf("expected newObj to be TestResource")
-	}
-
-	return nil, r.validate(ctx).ToAggregate()
+func (*TestResource) ValidateUpdate(ctx context.Context, oldObj, newObj *TestResource) (admission.Warnings, error) {
+	return nil, newObj.validate(ctx).ToAggregate()
 }
 
-func (*TestResource) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	_, ok := obj.(*TestResource)
-	if !ok {
-		return nil, fmt.Errorf("expected obj to be TestResource")
-	}
-
+func (*TestResource) ValidateDelete(ctx context.Context, obj *TestResource) (admission.Warnings, error) {
 	return nil, nil
 }
 

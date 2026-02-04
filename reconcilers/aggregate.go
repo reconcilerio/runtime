@@ -28,6 +28,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -59,6 +60,10 @@ type AggregateReconciler[Type client.Object] struct {
 	//
 	// +optional
 	Setup func(ctx context.Context, mgr Manager, bldr *Builder) error
+	// SetupForOptions are passed to the builder's For() method
+	//
+	// +optional
+	SetupForOptions []builder.ForOption
 
 	// Type of resource to reconcile. Required when the generic type is not a
 	// struct, or is unstructured.
@@ -166,7 +171,7 @@ func (r *AggregateReconciler[T]) SetupWithManagerYieldingController(ctx context.
 
 	bldr := ctrl.NewControllerManagedBy(mgr)
 	if !duck.IsDuck(r.Type, r.Config.Scheme()) {
-		bldr.For(r.Type)
+		bldr.For(r.Type, r.SetupForOptions...)
 	} else {
 		gvk, err := r.Config.GroupVersionKindFor(r.Type)
 		if err != nil {
@@ -176,7 +181,7 @@ func (r *AggregateReconciler[T]) SetupWithManagerYieldingController(ctx context.
 		u := &unstructured.Unstructured{}
 		u.SetAPIVersion(apiVersion)
 		u.SetKind(kind)
-		bldr.For(u)
+		bldr.For(u, r.SetupForOptions...)
 	}
 	if r.Setup != nil {
 		if err := r.Setup(ctx, mgr, bldr); err != nil {

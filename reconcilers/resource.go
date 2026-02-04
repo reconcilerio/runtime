@@ -72,6 +72,10 @@ type ResourceReconciler[Type client.Object] struct {
 	//
 	// +optional
 	Setup func(ctx context.Context, mgr ctrl.Manager, bldr *builder.Builder) error
+	// SetupForOptions are passed to the builder's For() method
+	//
+	// +optional
+	SetupForOptions []builder.ForOption
 
 	// Type of resource to reconcile. Required when the generic type is not a
 	// struct, or is unstructured.
@@ -191,7 +195,7 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 
 	bldr := ctrl.NewControllerManagedBy(mgr)
 	if !duck.IsDuck(r.Type, r.Config.Scheme()) {
-		bldr.For(r.Type)
+		bldr.For(r.Type, r.SetupForOptions...)
 	} else {
 		gvk, err := r.Config.GroupVersionKindFor(r.Type)
 		if err != nil {
@@ -201,7 +205,7 @@ func (r *ResourceReconciler[T]) SetupWithManagerYieldingController(ctx context.C
 		u := &unstructured.Unstructured{}
 		u.SetAPIVersion(apiVersion)
 		u.SetKind(kind)
-		bldr.For(u)
+		bldr.For(u, r.SetupForOptions...)
 	}
 
 	ctx = r.withContext(ctx)

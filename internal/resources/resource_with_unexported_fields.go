@@ -24,18 +24,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reconciler.io/runtime/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 var (
-	_ webhook.CustomDefaulter = &TestResourceUnexportedFields{}
-	_ webhook.CustomValidator = &TestResourceUnexportedFields{}
-	_ client.Object           = &TestResourceUnexportedFields{}
+	_ admission.Defaulter[*TestResourceUnexportedFields] = &TestResourceUnexportedFields{}
+	_ admission.Validator[*TestResourceUnexportedFields] = &TestResourceUnexportedFields{}
+	_ client.Object                                      = &TestResourceUnexportedFields{}
 )
 
 // +kubebuilder:object:root=true
@@ -49,47 +47,24 @@ type TestResourceUnexportedFields struct {
 	Status TestResourceUnexportedFieldsStatus `json:"status"`
 }
 
-func (*TestResourceUnexportedFields) Default(ctx context.Context, obj runtime.Object) error {
-	r, ok := obj.(*TestResourceUnexportedFields)
-	if !ok {
-		return fmt.Errorf("expected obj to be TestResourceUnexportedFields")
+func (*TestResourceUnexportedFields) Default(ctx context.Context, obj *TestResourceUnexportedFields) error {
+	if obj.Spec.Fields == nil {
+		obj.Spec.Fields = map[string]string{}
 	}
-	if r.Spec.Fields == nil {
-		r.Spec.Fields = map[string]string{}
-	}
-	r.Spec.Fields["Defaulter"] = "ran"
+	obj.Spec.Fields["Defaulter"] = "ran"
 
 	return nil
 }
 
-func (*TestResourceUnexportedFields) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	r, ok := obj.(*TestResourceUnexportedFields)
-	if !ok {
-		return nil, fmt.Errorf("expected obj to be TestResourceUnexportedFields")
-	}
-
-	return nil, r.validate(ctx).ToAggregate()
+func (*TestResourceUnexportedFields) ValidateCreate(ctx context.Context, obj *TestResourceUnexportedFields) (admission.Warnings, error) {
+	return nil, obj.validate(ctx).ToAggregate()
 }
 
-func (*TestResourceUnexportedFields) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	_, ok := oldObj.(*TestResourceUnexportedFields)
-	if !ok {
-		return nil, fmt.Errorf("expected oldObj to be TestResourceUnexportedFields")
-	}
-	r, ok := newObj.(*TestResourceUnexportedFields)
-	if !ok {
-		return nil, fmt.Errorf("expected newObj to be TestResourceUnexportedFields")
-	}
-
-	return nil, r.validate(ctx).ToAggregate()
+func (*TestResourceUnexportedFields) ValidateUpdate(ctx context.Context, oldObj, newObj *TestResourceUnexportedFields) (admission.Warnings, error) {
+	return nil, newObj.validate(ctx).ToAggregate()
 }
 
-func (*TestResourceUnexportedFields) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	_, ok := obj.(*TestResourceUnexportedFields)
-	if !ok {
-		return nil, fmt.Errorf("expected obj to be TestResourceUnexportedFields")
-	}
-
+func (*TestResourceUnexportedFields) ValidateDelete(ctx context.Context, obj *TestResourceUnexportedFields) (admission.Warnings, error) {
 	return nil, nil
 }
 

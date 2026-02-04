@@ -30,6 +30,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"reconciler.io/runtime/internal"
 	"reconciler.io/runtime/stash"
@@ -37,7 +38,6 @@ import (
 	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crlog "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -251,7 +251,12 @@ func (r *AdmissionWebhookAdapter[T]) reconcile(ctx context.Context, req admissio
 		return err
 	}
 
-	if defaulter, ok := client.Object(resource).(webhook.CustomDefaulter); ok {
+	if defaulter, ok := client.Object(resource).(admission.Defaulter[runtime.Object]); ok {
+		// resource.Default(ctx, resource)
+		if err := defaulter.Default(ctx, resource); err != nil {
+			return err
+		}
+	} else if defaulter, ok := client.Object(resource).(admission.Defaulter[T]); ok {
 		// resource.Default(ctx, resource)
 		if err := defaulter.Default(ctx, resource); err != nil {
 			return err

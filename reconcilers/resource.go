@@ -31,12 +31,13 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"reconciler.io/runtime/duck"
 	"reconciler.io/runtime/internal"
@@ -334,7 +335,12 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 	}
 	resource := originalResource.DeepCopyObject().(T)
 
-	if defaulter, ok := client.Object(resource).(webhook.CustomDefaulter); ok {
+	if defaulter, ok := client.Object(resource).(admission.Defaulter[runtime.Object]); ok {
+		// resource.Default(ctx, resource)
+		if err := defaulter.Default(ctx, resource); err != nil {
+			return Result{}, err
+		}
+	} else if defaulter, ok := client.Object(resource).(admission.Defaulter[T]); ok {
 		// resource.Default(ctx, resource)
 		if err := defaulter.Default(ctx, resource); err != nil {
 			return Result{}, err

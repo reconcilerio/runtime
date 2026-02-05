@@ -134,6 +134,15 @@ func TestTestResourceUnexportedFieldsStatusDie_MissingMethods(t *testingx.T) {
 	}
 }
 
+func TestTestResourceWithDefaultDie_MissingMethods(t *testingx.T) {
+	die := TestResourceWithDefaultBlank
+	ignore := []string{"TypeMeta", "ObjectMeta"}
+	diff := testing.DieFieldDiff(die).Delete(ignore...)
+	if diff.Len() != 0 {
+		t.Errorf("found missing fields for TestResourceWithDefaultDie: %s", diff.List())
+	}
+}
+
 func TestTestResourceWithLegacyDefaultDie_MissingMethods(t *testingx.T) {
 	die := TestResourceWithLegacyDefaultBlank
 	ignore := []string{"TypeMeta", "ObjectMeta"}

@@ -1673,6 +1673,108 @@ func TestResourceReconciler_UnexportedFields(t *testing.T) {
 	})
 }
 
+func TestResourceReconciler_Default(t *testing.T) {
+	testNamespace := "test-namespace"
+	testName := "test-resource"
+	testRequest := reconcilers.Request{
+		NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: testName},
+	}
+
+	scheme := runtime.NewScheme()
+	_ = resources.AddToScheme(scheme)
+
+	createResource := dies.TestResourceWithDefaultBlank.
+		MetadataDie(func(d *diemetav1.ObjectMetaDie) {
+			d.Namespace(testNamespace)
+			d.Name(testName)
+		})
+	givenResource := createResource.
+		StatusDie(func(d *dies.TestResourceStatusDie) {
+			d.ConditionsDie(
+				diemetav1.ConditionBlank.Type(apis.ConditionReady).Status(metav1.ConditionUnknown).Reason("Initializing"),
+			)
+		})
+
+	rts := rtesting.ReconcilerTests{
+		"resource is defaulted": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResourceWithDefault{},
+			},
+			GivenObjects: []client.Object{
+				givenResource,
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResourceWithDefault] {
+					return &reconcilers.SyncReconciler[*resources.TestResourceWithDefault]{
+						Sync: func(ctx context.Context, resource *resources.TestResourceWithDefault) error {
+							if expected, actual := "ran", resource.Spec.Fields["Defaulter"]; expected != actual {
+								t.Errorf("unexpected default value, actually = %v, expected = %v", expected, actual)
+							}
+							return nil
+						},
+					}
+				},
+			},
+		},
+		"status conditions are initialized": {
+			Request: testRequest,
+			StatusSubResourceTypes: []client.Object{
+				&resources.TestResourceWithDefault{},
+			},
+			GivenObjects: []client.Object{
+				givenResource.StatusDie(func(d *dies.TestResourceStatusDie) {
+					d.ConditionsDie()
+				}),
+			},
+			Metadata: map[string]interface{}{
+				"SubReconciler": func(t *testing.T, c reconcilers.Config) reconcilers.SubReconciler[*resources.TestResourceWithDefault] {
+					return &reconcilers.SyncReconciler[*resources.TestResourceWithDefault]{
+						Sync: func(ctx context.Context, resource *resources.TestResourceWithDefault) error {
+							expected := []metav1.Condition{
+								{Type: apis.ConditionReady, Status: metav1.ConditionUnknown, Reason: "Initializing"},
+							}
+							if diff := cmp.Diff(expected, resource.Status.Conditions, rtesting.IgnoreLastTransitionTime); diff != "" {
+								t.Errorf("Unexpected condition (-expected, +actual): %s", diff)
+							}
+							return nil
+						},
+					}
+				},
+			},
+			ExpectEvents: []rtesting.Event{
+				rtesting.NewEvent(givenResource, scheme, corev1.EventTypeNormal, "StatusUpdated",
+					`Updated status`),
+			},
+			ExpectStatusUpdates: []client.Object{
+				givenResource,
+			},
+		},
+	}
+
+	rts.Run(t, scheme, func(t *testing.T, rtc *rtesting.ReconcilerTestCase, c reconcilers.Config) reconcile.Reconciler {
+		skipStatusUpdate := false
+		if skip, ok := rtc.Metadata["SkipStatusUpdate"].(bool); ok {
+			skipStatusUpdate = skip
+		}
+		var beforeReconcile func(context.Context, reconcilers.Request) (context.Context, reconcilers.Result, error)
+		if before, ok := rtc.Metadata["BeforeReconcile"].(func(context.Context, reconcilers.Request) (context.Context, reconcilers.Result, error)); ok {
+			beforeReconcile = before
+		}
+		var afterReconcile func(context.Context, reconcilers.Request, reconcilers.Result, error) (reconcilers.Result, error)
+		if after, ok := rtc.Metadata["AfterReconcile"].(func(context.Context, reconcilers.Request, reconcilers.Result, error) (reconcilers.Result, error)); ok {
+			afterReconcile = after
+		}
+		return &reconcilers.ResourceReconciler[*resources.TestResourceWithDefault]{
+			Reconciler:       rtc.Metadata["SubReconciler"].(func(*testing.T, reconcilers.Config) reconcilers.SubReconciler[*resources.TestResourceWithDefault])(t, c),
+			SkipStatusUpdate: skipStatusUpdate,
+			BeforeReconcile:  beforeReconcile,
+			AfterReconcile:   afterReconcile,
+			Config:           c,
+		}
+	})
+}
+
 func TestResourceReconciler_LegacyDefault(t *testing.T) {
 	testNamespace := "test-namespace"
 	testName := "test-resource"

@@ -251,9 +251,9 @@ func (r *AdmissionWebhookAdapter[T]) reconcile(ctx context.Context, req admissio
 		return err
 	}
 
-	if defaulter, ok := client.Object(resource).(admission.Defaulter[runtime.Object]); ok {
+	if defaulter, ok := client.Object(resource).(validation.Defaulter); ok {
 		// resource.Default(ctx, resource)
-		if err := defaulter.Default(ctx, resource); err != nil {
+		if err := defaulter.Default(ctx); err != nil {
 			return err
 		}
 	} else if defaulter, ok := client.Object(resource).(admission.Defaulter[T]); ok {
@@ -261,7 +261,12 @@ func (r *AdmissionWebhookAdapter[T]) reconcile(ctx context.Context, req admissio
 		if err := defaulter.Default(ctx, resource); err != nil {
 			return err
 		}
-	} else if defaulter, ok := client.Object(resource).(objectDefaulter); ok {
+	} else if defaulter, ok := client.Object(resource).(admission.Defaulter[runtime.Object]); ok {
+		// resource.Default(ctx, resource)
+		if err := defaulter.Default(ctx, resource); err != nil {
+			return err
+		}
+	} else if defaulter, ok := client.Object(resource).(legacyDefaulter); ok {
 		// resource.Default()
 		defaulter.Default()
 	}

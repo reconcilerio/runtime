@@ -335,9 +335,9 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 	}
 	resource := originalResource.DeepCopyObject().(T)
 
-	if defaulter, ok := client.Object(resource).(admission.Defaulter[runtime.Object]); ok {
+	if defaulter, ok := client.Object(resource).(validation.Defaulter); ok {
 		// resource.Default(ctx, resource)
-		if err := defaulter.Default(ctx, resource); err != nil {
+		if err := defaulter.Default(ctx); err != nil {
 			return Result{}, err
 		}
 	} else if defaulter, ok := client.Object(resource).(admission.Defaulter[T]); ok {
@@ -345,7 +345,12 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 		if err := defaulter.Default(ctx, resource); err != nil {
 			return Result{}, err
 		}
-	} else if defaulter, ok := client.Object(resource).(objectDefaulter); ok {
+	} else if defaulter, ok := client.Object(resource).(admission.Defaulter[runtime.Object]); ok {
+		// resource.Default(ctx, resource)
+		if err := defaulter.Default(ctx, resource); err != nil {
+			return Result{}, err
+		}
+	} else if defaulter, ok := client.Object(resource).(legacyDefaulter); ok {
 		// resource.Default()
 		defaulter.Default()
 	}

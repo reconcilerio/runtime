@@ -20,13 +20,18 @@ import (
 	"fmt"
 	"reflect"
 
+	"reconciler.io/runtime/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// objectDefaulter mirrors the former upstream interface webhook.Defaulter which was deprecated and
+// Alternative interface similar to admission.Defaulter, but requires the object being defaulted
+// is the receiver rather than being passed as an argument.
+type Defaulter = validation.Defaulter
+
+// legacyDefaulter mirrors the former upstream interface webhook.Defaulter which was deprecated and
 // removed. We use this interface when reconciling a resource to set default values to a common
 // baseline.
-type objectDefaulter interface {
+type legacyDefaulter interface {
 	Default()
 }
 

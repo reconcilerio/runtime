@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	reconciler.io/dies/diegen v0.18.0
-	sigs.k8s.io/controller-tools v0.20.0
+	sigs.k8s.io/controller-tools v0.20.1
 )
 
 require (

@@ -11,6 +11,7 @@ updates:
     kubernetes:
       patterns:
       - "k8s.io/*"
+      - "reconciler.io/dies"
   schedule:
     interval: daily
   open-pull-requests-limit: 10

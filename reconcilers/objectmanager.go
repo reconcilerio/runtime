@@ -143,11 +143,12 @@ func (r *UpdatingObjectManager[T]) SetupWithManager(ctx context.Context, mgr ctr
 		var ct client.Object = r.Type
 		if duck.IsDuck(ct, mgr.GetScheme()) {
 			gvk := ct.GetObjectKind().GroupVersionKind()
-			ct = &unstructured.Unstructured{}
-			ct.GetObjectKind().SetGroupVersionKind(gvk)
+			u := &unstructured.Unstructured{}
+			u.GetObjectKind().SetGroupVersionKind(gvk)
+			bldr.Watches(u, EnqueueTracked(ctx))
+		} else {
+			bldr.Watches(ct, EnqueueTracked(ctx))
 		}
-
-		bldr.Watches(ct, EnqueueTracked(ctx))
 	}
 
 	return nil

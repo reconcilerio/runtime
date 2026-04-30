@@ -203,12 +203,14 @@ func (r *ChildReconciler[T, CT, CLT]) SetupWithManager(ctx context.Context, mgr 
 		var ct client.Object = r.ChildType
 		if duck.IsDuck(ct, mgr.GetScheme()) {
 			gvk := ct.GetObjectKind().GroupVersionKind()
-			ct = &unstructured.Unstructured{}
-			ct.GetObjectKind().SetGroupVersionKind(gvk)
+			u := &unstructured.Unstructured{}
+			u.GetObjectKind().SetGroupVersionKind(gvk)
+			bldr.Owns(u)
+			bldr.Watches(u, EnqueueTracked(ctx))
+		} else {
+			bldr.Owns(ct)
+			bldr.Watches(ct, EnqueueTracked(ctx))
 		}
-
-		bldr.Owns(ct)
-		bldr.Watches(ct, EnqueueTracked(ctx))
 	}
 
 	if err := r.ChildObjectManager.SetupWithManager(ctx, mgr, bldr); err != nil {

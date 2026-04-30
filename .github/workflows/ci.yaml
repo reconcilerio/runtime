@@ -13,12 +13,13 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code into the Go module directory
+    - name: Check out code
       uses: actions/checkout@v6
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
+        cache-dependency-path: '**/*.sum'
     - name: Get dependencies
       run: |
         go get -v -t -d ./...

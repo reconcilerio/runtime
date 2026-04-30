@@ -232,7 +232,7 @@ func TestExpectConfig(t *testing.T) {
 					t.Fatalf("unexpected error from ServerResourcesForGroupVersion: %s", err)
 				}
 				if expected, actual := 1, len(resources.APIResources); expected != actual {
-					t.Errorf("unexpected APIResources length: expected %q, actual %q", expected, actual)
+					t.Errorf("unexpected APIResources length: expected %d, actual %d", expected, actual)
 				}
 				if expected, actual := "TestResource", resources.APIResources[0].Kind; expected != actual {
 					t.Errorf("unexpected kind: expected %q, actual %q", expected, actual)

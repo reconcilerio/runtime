@@ -15,7 +15,7 @@ require (
 	k8s.io/client-go v0.36.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	reconciler.io/dies v0.19.0
-	sigs.k8s.io/controller-runtime v0.23.3
+	sigs.k8s.io/controller-runtime v0.24.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -30,7 +30,6 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.2 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
-	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

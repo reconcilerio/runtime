@@ -7,7 +7,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-cmp v0.7.0
-	golang.org/x/net v0.54.0
+	golang.org/x/net v0.55.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gomodules.xyz/jsonpatch/v3 v3.0.1
 	k8s.io/api v0.36.1
@@ -51,7 +51,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.14.0 // indirect

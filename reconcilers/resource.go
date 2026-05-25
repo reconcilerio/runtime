@@ -117,7 +117,7 @@ type ResourceReconciler[Type client.Object] struct {
 	AfterReconcile func(ctx context.Context, req Request, res Result, err error) (Result, error)
 
 	// SkipResource shortcuts the reconciler for the specific request. While the context and logger
-	// are initialized, no work is preformed. The request is removed from the workqueue.
+	// are initialized, no work is performed. The request is removed from the workqueue.
 	//
 	// +optional
 	SkipRequest func(ctx context.Context, req Request) bool
@@ -131,6 +131,12 @@ type ResourceReconciler[Type client.Object] struct {
 	// +optional
 	SkipResource func(ctx context.Context, resource Type) bool
 
+	// IfNotFound is called if the resource doesn't exist yet. Return nil if the reconcile should
+	// be aborted.
+	//
+	// +optional
+	IfNotFound func(ctx context.Context, req Request) Type
+
 	Config Config
 
 	lazyInit sync.Once
@@ -141,6 +147,12 @@ func (r *ResourceReconciler[T]) init() {
 		if internal.IsNil(r.Type) {
 			var nilT T
 			r.Type = newEmpty(nilT).(T)
+		}
+		if r.IfNotFound == nil {
+			r.IfNotFound = func(ctx context.Context, req Request) T {
+				var nilT T
+				return nilT
+			}
 		}
 		if r.Name == "" {
 			r.Name = fmt.Sprintf("%sResourceReconciler", typeName(r.Type))
@@ -320,13 +332,18 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 
 	originalResource := r.Type.DeepCopyObject().(T)
 
-	if err := c.Get(ctx, req.NamespacedName, originalResource); err != nil {
-		if apierrs.IsNotFound(err) {
-			// we'll ignore not-found errors, since they can't be fixed by an immediate
-			// requeue (we'll need to wait for a new notification), and we can get them
-			// on deleted requests.
+	err := c.Get(ctx, req.NamespacedName, originalResource)
+	switch {
+	case err == nil:
+		// all good, continue
+	case apierrs.IsNotFound(err):
+		// we'll ignore not-found errors, since they can't be fixed by an immediate
+		// requeue (we'll need to wait for a new notification), and we can get them
+		// on deleted requests – except if `IfNotFound` returns a new resource
+		if originalResource = r.IfNotFound(ctx, req); internal.IsNil(originalResource) {
 			return Result{}, nil
 		}
+	default:
 		if !errors.Is(err, ErrQuiet) {
 			log.Error(err, "unable to fetch resource")
 		}

@@ -309,6 +309,9 @@ func (r *ResourceReconciler[T]) Reconcile(ctx context.Context, req Request) (Res
 	result, err := r.AfterReconcile(ctx, req, AggregateResults(beforeResult, reconcileResult), err)
 	if errors.Is(err, ErrQuiet) {
 		// suppress error, while forcing a requeue
+		if result.RequeueAfter > 0 { // honor requeue after returned by reconciler
+			return result, nil
+		}
 		return Result{Requeue: true}, nil
 	}
 	return result, err
@@ -409,7 +412,11 @@ func (r *ResourceReconciler[T]) reconcileOuter(ctx context.Context, req Request)
 		}
 
 		// Suppress result. Let the informer discover the resource mutation and requeue. Requeueing
-		// now may result in re-processing a stale cache.
+		// now may result in re-processing a stale cache. Honor the requeue after if it was set.
+		if result.RequeueAfter > 0 {
+			return result, nil
+		}
+
 		return Result{}, nil
 	}
 

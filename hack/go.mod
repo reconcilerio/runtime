@@ -3,7 +3,7 @@ module reconciler.io/runtime/hack
 go 1.26.0
 
 require (
-	reconciler.io/dies/diegen v0.19.0
+	reconciler.io/dies/diegen v0.19.1
 	sigs.k8s.io/controller-tools v0.21.0
 )
 

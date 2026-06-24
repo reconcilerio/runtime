@@ -222,8 +222,8 @@ k8s.io/kube-openapi v0.0.0-20260427204847-8949caaa1199 h1:sWu4Td5mgJlwunsUydnhKE
 k8s.io/kube-openapi v0.0.0-20260427204847-8949caaa1199/go.mod h1:uGBT7iTA6c6MvqUvSXIaYZo9ukscABYi2btjhvgKGZ0=
 k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 h1:kBawHLSnx/mYHmRnNUf9d4CpjREbeZuxoSGOX/J+aYM=
 k8s.io/utils v0.0.0-20260319190234-28399d86e0b5/go.mod h1:xDxuJ0whA3d0I4mf/C4ppKHxXynQ+fxnkmQH0vTHnuk=
-reconciler.io/dies/diegen v0.19.0 h1:ss4rjYzXTE4rNNAafXkrCzCdjqgJuMmQcafN/Kzaem0=
-reconciler.io/dies/diegen v0.19.0/go.mod h1:9o0ps/bK0ibam0F6tNgUEhBzOXav/FfQcnIbATbzPP8=
+reconciler.io/dies/diegen v0.19.1 h1:WdsjDWkdq6T+ue6AJImyIgURYhcxAueO35E/o+xLrXk=
+reconciler.io/dies/diegen v0.19.1/go.mod h1:9o0ps/bK0ibam0F6tNgUEhBzOXav/FfQcnIbATbzPP8=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 h1:hSfpvjjTQXQY2Fol2CS0QHMNs/WI1MOSGzCm1KhM5ec=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0/go.mod h1:Ve9uj1L+deCXFrPOk1LpFXqTg7LCFzFso6PA48q/XZw=
 sigs.k8s.io/controller-tools v0.21.0 h1:KXDQza3bgjlPY6xLR63tI/40gzjhyUAvkCrwzd2/6cs=
